@@ -1,0 +1,19 @@
+[INFO] Application Startup - Game Engine
+[INFO] Initializing D3D12RenderAdapter...
+[INFO] === MAIN MENU ===
+[INFO] Press ENTER to start the game
+[INFO] Press 'W' to toggle Secondary Window
+[INFO] Application successfully initialized. Starting the main Game Loop.
+[INFO] Frame 1 | DeltaTime: 0.023281s
+[INFO] Frame 100 | DeltaTime: 0.006392s
+[INFO] Frame 200 | DeltaTime: 0.007441s
+[INFO] Frame 300 | DeltaTime: 0.007027s
+[INFO] Frame 400 | DeltaTime: 0.007176s
+[INFO] Frame 500 | DeltaTime: 0.006617s
+[INFO] Exiting Main Menu.
+[INFO] === GAMEPLAY ===
+[INFO] LMB: Scale | RMB: Rotate | P: Pause
+[INFO] Press 'W' to toggle Secondary Window
+[INFO] Secondary Window: SHOWN
+[INFO] Secondary Window: HIDDEN
+[INFO] Exiting Gameplay.
