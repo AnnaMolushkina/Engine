@@ -5,7 +5,7 @@
 [INFO] Press ENTER to start the game
 [INFO] Press 'W' to toggle Secondary Window
 [INFO] Application successfully initialized. Starting the main Game Loop.
-[INFO] Frame 1 | DeltaTime: 0.005995s
+[INFO] Frame 1 | DeltaTime: 0.001002s
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
@@ -15,56 +15,7 @@
 [INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
-[INFO] Frame 100 | DeltaTime: 0.006865s
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] Frame 200 | DeltaTime: 0.007071s
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] Secondary Window: SHOWN
-[INFO] Frame 300 | DeltaTime: 0.006177s
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] Frame 400 | DeltaTime: 0.006421s
+[INFO] Frame 100 | DeltaTime: 0.006952s
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
@@ -88,7 +39,8 @@
 [INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
-[INFO] Frame 500 | DeltaTime: 0.006293s
+[INFO] Frame 200 | DeltaTime: 0.006959s
+[INFO] Triangle Rotation STARTED
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
@@ -98,22 +50,15 @@
 [INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
+[INFO] Rhombus Jumping STARTED
+[INFO] Frame 300 | DeltaTime: 0.006856s
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
 [INFO] Camera position: (0.000000, 2.000000, 8.000000)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.000000, 2.000000, 8.000000)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, 0.286896, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
@@ -122,259 +67,163 @@
 [INFO] Camera position: (0.000000, 2.000000, 8.000000)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, 0.999438, 0.000000)
+[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
+[INFO] ============================
+[INFO] Frame 400 | DeltaTime: 0.007066s
+[INFO] === SPATIAL GRID DEBUG ===
+[INFO] Total entities: 3
+[INFO] Visible entities (radius 30): 3
+[INFO] Camera position: (0.000000, 2.000000, 8.000000)
+[INFO] Grid cells count: 2
+[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, 0.348615, 0.000000)
+[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
+[INFO] ============================
+[INFO] Scene saved to scene.json
+[INFO] === SPATIAL GRID DEBUG ===
+[INFO] Total entities: 3
+[INFO] Visible entities (radius 30): 3
+[INFO] Camera position: (0.000000, 2.000000, 8.000000)
+[INFO] Grid cells count: 2
+[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.791215, 0.000000)
+[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
+[INFO] ============================
+[INFO] Frame 500 | DeltaTime: 0.007092s
+[INFO] Cleared 3 old entities
+[INFO] Restored triangle entity: 5
+[INFO] Restored circle/rhombus entity: 6
+[INFO] Restored square entity: 7
+[INFO] Loaded 3 entities
+[INFO] Scene loaded from scene.json
+[INFO] Triangle restored with angle: 2.555909
+[INFO] Circle restored with Y: -0.763977
+[INFO] Square restored
+[INFO] === SPATIAL GRID DEBUG ===
+[INFO] Total entities: 3
+[INFO] Visible entities (radius 30): 3
+[INFO] Camera position: (0.000000, 2.000000, 8.000000)
+[INFO] Grid cells count: 2
+[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-0.448095, 2.000000, 7.987441)
+[INFO] Camera position: (0.000000, 2.000000, 8.000000)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-6.338480, 2.000000, 4.880949)
+[INFO] Camera position: (0.000000, 2.000000, 7.306767)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-7.346732, 2.000000, 3.166313)
+[INFO] Camera position: (0.000000, 2.000000, 5.230301)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-7.346732, 2.000000, 3.166313)
+[INFO] Camera position: (0.000000, 2.000000, 3.151053)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-7.346732, 2.000000, 3.166313)
+[INFO] Camera position: (1.781697, 2.000000, 2.413619)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-6.550335, 2.000000, 2.823080)
+[INFO] Camera position: (2.973868, 2.000000, 0.395105)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-4.611537, 2.000000, 1.987492)
+[INFO] Camera position: (2.036955, 2.000000, 2.202456)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.755024, 2.000000, 1.187367)
+[INFO] Camera position: (1.322014, 2.000000, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.755024, 2.000000, 1.187367)
+[INFO] Camera position: (1.322014, 3.183986, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.755024, 2.000000, 1.187367)
+[INFO] Camera position: (1.322014, 2.520187, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.755024, 0.855221, 1.187367)
+[INFO] Camera position: (1.322014, 1.273528, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.755024, 0.500000, 1.187367)
+[INFO] Camera position: (1.322014, 0.500000, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] === SPATIAL GRID DEBUG ===
 [INFO] Total entities: 3
 [INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.771859, 0.500000, 1.147518)
+[INFO] Camera position: (1.322014, 0.500000, 2.693006)
 [INFO] Grid cells count: 2
 [INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.939125, 0.500000, -0.601286)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-2.568029, 0.500000, 1.550879)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (-1.888331, 0.500000, 2.331138)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (0.564908, 0.500000, 2.946333)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.445065, 0.500000, 1.738292)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
-[INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
-[INFO] ============================
-[INFO] === SPATIAL GRID DEBUG ===
-[INFO] Total entities: 3
-[INFO] Visible entities (radius 30): 3
-[INFO] Camera position: (2.783633, 0.500000, 1.118654)
-[INFO] Grid cells count: 2
-[INFO]   Visible: MainWindow at (-0.400000, 0.000000, 0.000000)
-[INFO]   Visible: MainWindow at (0.400000, 0.000000, 0.000000)
+[INFO]   Visible: MainWindow at (0.400000, -0.763977, 0.000000)
 [INFO]   Visible: SecondaryWindow at (0.000000, 0.000000, 0.000000)
 [INFO] ============================
 [INFO] Exiting Gameplay.

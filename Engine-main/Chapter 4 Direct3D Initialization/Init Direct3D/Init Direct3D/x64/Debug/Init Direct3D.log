@@ -1,4 +1,13 @@
-﻿  InitDirect3DApp.cpp
+﻿  d3dApp.cpp
+  d3dUtil.cpp
+C:\Users\Nika\Desktop\AID\Engine-main\Common\d3dUtil.h(232,34): warning C4305: инициализация: усечение из "double" в "float"
+  (компиляция исходного файла "../../Common/d3dApp.cpp")
+  
+C:\Users\Nika\Desktop\AID\Engine-main\Common\d3dUtil.h(232,34): warning C4305: инициализация: усечение из "double" в "float"
+  (компиляция исходного файла "../../Common/d3dUtil.cpp")
+  
+  GameTimer.cpp
+  InitDirect3DApp.cpp
 C:\Users\Nika\Desktop\AID\Engine-main\Common\d3dUtil.h(232,34): warning C4305: инициализация: усечение из "double" в "float"
   (компиляция исходного файла "InitDirect3DApp.cpp")
   
@@ -30,4 +39,6 @@ C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.3313
               _Size=unsigned __int64
           ]
   
+  ResourceManager.h
+  Создание кода...
   Init Direct3D.vcxproj -> C:\Users\Nika\Desktop\AID\Engine-main\Chapter 4 Direct3D Initialization\Init Direct3D\x64\Debug\Init Direct3D.exe
