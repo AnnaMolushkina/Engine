@@ -15,19 +15,6 @@ public:
         return instance;
     }
 
-    /*std::shared_ptr<Texture> LoadTexture(const std::string& path) {
-        auto it = m_textures.find(path);
-        if (it != m_textures.end()) {
-            return it->second;
-        }
-        auto texture = std::make_shared<Texture>();
-        if (texture->Load(path)) {
-            m_textures[path] = texture;
-            return texture;
-        }
-        return nullptr;
-    }*/
-
     // ѕроста€ верси€ дл€ MeshData (без полного шаблона пока)
     std::shared_ptr<MeshData> LoadMesh(const std::string& path) {
         auto it = m_meshes.find(path);

@@ -29,31 +29,34 @@ GPUMesh D3D12RenderAdapter::UploadMesh(const MeshData& meshData,
     }
 
     const SubMesh& subMesh = meshData.subMeshes[0];
-
     GPUMesh gpuMesh;
+
     gpuMesh.IndexCount = static_cast<UINT>(subMesh.indices.size());
 
+    // === Vertex Buffer ===
     const UINT vbByteSize = static_cast<UINT>(subMesh.vertices.size() * sizeof(Vertex3D));
     gpuMesh.VertexBuffer = d3dUtil::CreateDefaultBuffer(
-        device, cmdList,
-        subMesh.vertices.data(), vbByteSize,
-        mVertexBufferUploader);
+        device, cmdList, subMesh.vertices.data(), vbByteSize, mVertexBufferUploader);
 
+    // === Index Buffer ===
     const UINT ibByteSize = static_cast<UINT>(subMesh.indices.size() * sizeof(uint32_t));
-    gpuMesh.IndexBuffer = d3dUtil::CreateDefaultBuffer(
-        device, cmdList,
-        subMesh.indices.data(), ibByteSize,
-        mIndexBufferUploader);
 
+    gpuMesh.IndexBuffer = d3dUtil::CreateDefaultBuffer(
+        device, cmdList, subMesh.indices.data(), ibByteSize, mIndexBufferUploader);
+
+    // Vertex Buffer View
     gpuMesh.VBV.BufferLocation = gpuMesh.VertexBuffer->GetGPUVirtualAddress();
     gpuMesh.VBV.StrideInBytes = sizeof(Vertex3D);
     gpuMesh.VBV.SizeInBytes = vbByteSize;
 
+    // Index Buffer View — ВАЖНО: используем R32_UINT, т.к. индексы uint32_t
     gpuMesh.IBV.BufferLocation = gpuMesh.IndexBuffer->GetGPUVirtualAddress();
-    gpuMesh.IBV.Format = DXGI_FORMAT_R32_UINT;
+    gpuMesh.IBV.Format = DXGI_FORMAT_R32_UINT;        //  было R16_UINT — ошибка!
     gpuMesh.IBV.SizeInBytes = ibByteSize;
 
-    Logger::Info("GPU Upload successful: " + meshData.filePath);
+    Logger::Info("GPU Upload successful: " + meshData.filePath
+        + " | Indices: " + std::to_string(gpuMesh.IndexCount));
+
     return gpuMesh;
 }
 
@@ -121,8 +124,28 @@ bool D3D12RenderAdapter::CreateTexture(TextureData& textureData, ID3D12Device* d
     textureData.uploadBuffer = uploadBuffer;   // сохраняем, чтобы не удалился до выполнения команд
 
     Logger::Info("Texture fully uploaded to GPU: " + textureData.filePath);
+
+    // Назначаем индекс SRV
+    int index = m_nextSRVIndex++;
+    textureData.srvIndex = index;
+    m_textureSRVIndices[textureData.filePath] = index;
+
+    Logger::Info("Assigned SRV index " + std::to_string(index) + " to texture: " + textureData.filePath);
+
+    CreateTextureSRV(textureData.textureResource, index);  // передаём индекс
+
+
     return true;
 }
+
+bool D3D12RenderAdapter::CreateTexture(TextureData& textureData)
+{
+    if (!textureData.IsValid() || textureData.srvIndex >= 0)
+        return false;
+
+    return CreateTexture(textureData, mApp->GetDevice(), mApp->GetCommandList());
+}
+
 ComPtr<ID3DBlob> D3D12RenderAdapter::CompileShaderFromFile(const std::string& filePath,
     const std::string& entryPoint,
     const std::string& target)
@@ -192,26 +215,33 @@ void D3D12RenderAdapter::DrawMesh(const GPUMesh& gpuMesh) {
 
     auto cmdList = mApp->mCommandList;
 
+    if (m_currentShader && m_currentShader->IsValid()) {
+        cmdList->SetPipelineState(mPSO.Get()); // или переключай PSO, если несколько шейдеров
+    }
+
     cmdList->SetGraphicsRootSignature(mRootSignature.Get());
 
-    if (m_currentTexture && m_currentTexture->textureResource) {
-        Logger::Info("DrawMesh: texture resource is present");
-    }
-    else {
-        Logger::Error("DrawMesh: no texture resource");
-    }
-    // Устанавливаем дескрипторный хип для текстур
-    ID3D12DescriptorHeap* heaps[] = { mTextureSrvHeap.Get() };
-    cmdList->SetDescriptorHeaps(_countof(heaps), heaps);
+    if (m_currentTexture && m_currentTexture->srvIndex >= 0)
+    {
+        // Устанавливаем дескрипторный хип
+        ID3D12DescriptorHeap* heaps[] = { mTextureSrvHeap.Get() };
+        cmdList->SetDescriptorHeaps(_countof(heaps), heaps);
 
-    // Если есть текстура, устанавливаем её
-    if (m_currentTexture && m_currentTexture->textureResource) {
         CD3DX12_GPU_DESCRIPTOR_HANDLE texHandle(
             mTextureSrvHeap->GetGPUDescriptorHandleForHeapStart(),
-            0,  // используем слот 0
-            mTextureSrvDescriptorSize
-        );
+            m_currentTexture->srvIndex,        // правильный индекс!
+            mTextureSrvDescriptorSize);
+
         cmdList->SetGraphicsRootDescriptorTable(1, texHandle);
+
+        Logger::Info("DrawMesh: SUCCESS using SRV index " + std::to_string(m_currentTexture->srvIndex)
+            + " for texture " + m_currentTexture->filePath);
+    }
+    else
+    {
+        Logger::Warning("DrawMesh: FAILED - texture=" +
+            (m_currentTexture ? m_currentTexture->filePath : "null") +
+            ", srvIndex=" + std::to_string(m_currentTexture ? m_currentTexture->srvIndex : -1));
     }
 
     // Устанавливаем константы
@@ -268,4 +298,34 @@ void D3D12RenderAdapter::CreateTextureSRV(ComPtr<ID3D12Resource> textureResource
     mApp->md3dDevice->CreateShaderResourceView(textureResource.Get(), &srvDesc, srvHandle);
 
     Logger::Info("Created SRV for texture at slot " + std::to_string(index));
+}
+
+bool D3D12RenderAdapter::UploadTextureToGPU(TextureData& textureData)
+{
+    if (!textureData.IsValid() || textureData.srvIndex >= 0)
+        return false;
+
+    // Открываем command list заново
+    ThrowIfFailed(mApp->mDirectCmdListAlloc->Reset());
+    ThrowIfFailed(mApp->mCommandList->Reset(mApp->mDirectCmdListAlloc.Get(), nullptr));
+
+    bool success = CreateTexture(textureData, mApp->md3dDevice.Get(), mApp->mCommandList.Get());
+
+    if (success) {
+        ThrowIfFailed(mApp->mCommandList->Close());
+        ID3D12CommandList* cmdLists[] = { mApp->mCommandList.Get() };
+        mApp->mCommandQueue->ExecuteCommandLists(1, cmdLists);
+        mApp->FlushCommandQueue();        // Ждём завершения копирования
+        Logger::Info("Successfully uploaded texture to GPU: " + textureData.filePath);
+    }
+    else {
+        Logger::Error("Failed to upload texture to GPU");
+    }
+
+    return success;
+}
+
+void D3D12RenderAdapter::SetShader(std::shared_ptr<ShaderProgram> shader)
+{
+    m_currentShader = shader ? shader : mShaderProgram;
 }

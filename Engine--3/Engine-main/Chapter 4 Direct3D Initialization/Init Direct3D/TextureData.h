@@ -13,6 +13,7 @@ struct TextureData : public Resource {
     int width = 0;
     int height = 0;
     int channels = 0;
+    int srvIndex = -1;
     std::vector<uint8_t> pixels;
 
     std::string filePath;

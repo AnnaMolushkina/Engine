@@ -1,14 +1,13 @@
-﻿  TextureData.cpp
-C:\Users\Анна\Documents\!ИТМО\Движки\Engine--3\Engine-main\Chapter 4 Direct3D Initialization\Init Direct3D\TextureData.cpp(1,1): warning C4005: STB_IMAGE_IMPLEMENTATION: изменение макроопределения
-      C:\Users\Анна\Documents\!ИТМО\Движки\Engine--3\Engine-main\Chapter 4 Direct3D Initialization\Init Direct3D\TextureData.cpp(1,1):
-      "STB_IMAGE_IMPLEMENTATION" ранее объявлен в командной строке
+﻿  InitDirect3DApp.cpp
+C:\Users\Анна\Documents\!ИТМО\Движки\Engine--3\Engine-main\Common\d3dUtil.h(232,34): warning C4305: инициализация: усечение из "double" в "float"
+  (компиляция исходного файла "InitDirect3DApp.cpp")
   
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53): warning C4244: аргумент: преобразование "wchar_t" в "const _Elem", возможна потеря данных
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53): warning C4244:         with
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53): warning C4244:         [
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53): warning C4244:             _Elem=char
 C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53): warning C4244:         ]
-  (компиляция исходного файла "TextureData.cpp")
+  (компиляция исходного файла "InitDirect3DApp.cpp")
       C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.38.33130\include\xstring(2749,53):
       контекст создания экземпляра шаблона (сначала самый старый)
           C:\Users\Анна\Documents\!ИТМО\Движки\Engine--3\Engine-main\Chapter 4 Direct3D Initialization\Init Direct3D\Logger.h(40,27):

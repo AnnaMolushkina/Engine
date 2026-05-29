@@ -163,31 +163,51 @@ void Application::InitScene()
     //mrTri.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     //mrTri.type = PrimitiveType::Triangle;
     //m_world.AddTag(m_rotatingTriangle, "MainWindow");
-    
-    
-     // Загружаем модель
-    auto meshData = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
 
-    // Создаём сущность
-    Entity loadedModel = m_world.CreateEntity();
-    Transform& tModel = m_world.AddTransform(loadedModel);
-    tModel.position = glm::vec3(0.0f, 0.0f, 0.0f);
-    tModel.scale = glm::vec3(1.0f, 1.0f, 1.0f);
-
-    MeshRenderer& mrModel = m_world.AddMeshRenderer(loadedModel);
-    mrModel.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    mrModel.useLoadedMesh = true;
-    mrModel.mesh = meshData;
-
-    // Привязываем текстуру (уже загруженную в адаптере)
     D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
-    if (d3d && d3d->GetMainTexture()) {
-        // Используем shared_ptr с пустым удалителем, чтобы не удалять оригинал
-        mrModel.texture = std::shared_ptr<TextureData>(d3d->GetMainTexture(), [](TextureData*) {});
-        Logger::Info("Texture assigned to entity");
+    // Загружаем шейдер один раз
+    auto defaultShader = d3d->CreateShaderProgram("Shaders/VertexShader.hlsl", "Shaders/PixelShader.hlsl");
+    // Stepler (используем уже загруженную в Initialize)
+    {
+        auto mesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
+
+        Entity e = m_world.CreateEntity();
+        Transform& t = m_world.AddTransform(e);
+        t.position = glm::vec3(-1.5f, 0.0f, 0.0f);
+
+        MeshRenderer& mr = m_world.AddMeshRenderer(e);
+        mr.mesh = mesh;
+        mr.texture = std::shared_ptr<TextureData>(d3d ? d3d->GetMainTexture() : nullptr, [](TextureData*) {});
+        mr.shader = defaultShader;
+        mr.useLoadedMesh = true;
+
+        m_world.AddTag(e, "MainWindow");
     }
 
-    m_world.AddTag(loadedModel, "MainWindow");
+    // Cube + heart.jpg
+    {
+        auto mesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
+        auto tex = ResourceManager::Get().LoadTextureData("assets/textures/heart.jpg");
+
+        if (tex && d3d) {
+            d3d->UploadTextureToGPU(*tex);   // новый метод
+        }
+
+        Entity e = m_world.CreateEntity();
+        Transform& t = m_world.AddTransform(e);
+        t.position = glm::vec3(1.5f, 0.0f, 0.0f);
+        t.scale = glm::vec3(1.3f);
+
+        MeshRenderer& mr = m_world.AddMeshRenderer(e);
+        mr.mesh = mesh;
+        mr.texture = tex;
+        mr.shader = defaultShader;
+        mr.useLoadedMesh = true;
+
+        m_world.AddTag(e, "MainWindow");
+    }
+
+    Logger::Info("InitScene completed");
 
     //// ========== ВЫТЯНУТЫЙ РОМБ ==========
     //m_circle = m_world.CreateEntity();
@@ -528,13 +548,11 @@ void Application::Draw(const GameTimer& gt)
                         mRenderAdapter->SetViewProjection(view, proj);
 
                         // ========== УСТАНОВКА ТЕКСТУРЫ ==========
-                        if (mr->texture && mr->texture->textureResource) {
+                        if (mr->texture) {
                             mRenderAdapter->SetTexture(mr->texture.get());
-                            Logger::Info("Setting texture for entity: " + std::to_string(e));
                         }
                         else {
                             mRenderAdapter->SetTexture(nullptr);
-                            Logger::Info("No texture for entity: " + std::to_string(e));
                         }
 
                         if (mr->useLoadedMesh && mr->mesh) {
@@ -565,6 +583,17 @@ void Application::Draw(const GameTimer& gt)
             }
         }
     }
+
+    //if (m_showECS && m_renderSystem) {
+    //    auto currentState = mStateManager.GetCurrentState();
+    //    if (currentState && dynamic_cast<PlayState*>(currentState.get())) {
+
+    //        m_world.UpdateSpatialGrid();
+
+    //        // Основная отрисовка теперь здесь:
+    //        m_renderSystem->UpdateWithLoadedMeshes(m_world, view, proj);
+    //    }
+    //}
 
     mRenderAdapter->EndFrame(0);
 
@@ -635,6 +664,7 @@ bool D3D12RenderAdapter::Initialize()
         if (CreateTexture(m_mainTextureData, mApp->md3dDevice.Get(), mApp->mCommandList.Get())) {
             CreateTextureSRV(m_mainTextureData.textureResource, 0);
             m_currentTexture = &m_mainTextureData;
+            m_mainTextureData.srvIndex = 0;
             Logger::Info("Main texture loaded and SRV created");
         }
         else {
@@ -823,57 +853,42 @@ void D3D12RenderAdapter::DrawPrimitiveECS(PrimitiveType type) {
     DrawPrimitive(type, position, rotation, scale);
 }
 
-void D3D12RenderAdapter::BuildRootSignature() {
-    // Параметр 0: 48 констант (World, View, Proj) - регистр b0
-    CD3DX12_ROOT_PARAMETER slotRootParameter[3];
-    slotRootParameter[0].InitAsConstants(48, 0);  // 48 констант, регистр b0
+void D3D12RenderAdapter::BuildRootSignature()
+{
+    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
 
-    // Параметр 1: дескрипторная таблица для текстуры (SRV) - регистр t0
+    // 0 — константы (World, View, Proj)
+    slotRootParameter[0].InitAsConstants(48, 0);
+
+    // 1 — таблица дескрипторов для текстуры (t0)
     CD3DX12_DESCRIPTOR_RANGE texTable;
-    texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);  // 1 текстура, регистр t0
+    texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
     slotRootParameter[1].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
 
-    // ========== ДОБАВИТЬ: Параметр 2: сэмплер (SAMPLER) - регистр s0 ==========
-    // В DirectX 12 сэмплеры могут быть либо в дескрипторной таблице, либо статические
-    // Самый простой способ - создать статический сэмплер
-    CD3DX12_STATIC_SAMPLER_DESC samplerDesc(
-        0,                                      // shaderRegister (s0)
-        D3D12_FILTER_MIN_MAG_MIP_LINEAR,       // filter
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP,       // addressU
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP,       // addressV
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP,       // addressW
-        0.0f,                                  // mipLODBias
-        1,                                     // maxAnisotropy
-        D3D12_COMPARISON_FUNC_NEVER,           // comparisonFunc
-        D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK, // borderColor
-        0.0f,                                  // minLOD
-        D3D12_FLOAT32_MAX,                     // maxLOD
-        D3D12_SHADER_VISIBILITY_PIXEL);        // shaderVisibility
+    // Статический сэмплер (s0)
+    CD3DX12_STATIC_SAMPLER_DESC samplerDesc(0,
+        D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+        D3D12_TEXTURE_ADDRESS_MODE_WRAP);
 
-    // Создаем root signature с двумя параметрами и одним статическим сэмплером
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
-        2,                                     // numberOfParameters (только параметры 0 и 1)
-        slotRootParameter,                     // parameters
-        1,                                     // numStaticSamplers
-        &samplerDesc,                          // staticSamplers
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
+        1, &samplerDesc,
         D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-    //// Создаем root signature с двумя параметрами
-    //CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 0, nullptr,
-    //    D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-    ComPtr<ID3DBlob> serializedRootSig = nullptr;
-    ComPtr<ID3DBlob> errorBlob = nullptr;
+    ComPtr<ID3DBlob> serializedRootSig;
+    ComPtr<ID3DBlob> errorBlob;
     HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
         serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-    if (errorBlob) {
-        OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+
+    if (FAILED(hr)) {
+        if (errorBlob) Logger::Error("Root Signature serialize error: " + std::string((char*)errorBlob->GetBufferPointer()));
     }
 
-    ThrowIfFailed(mApp->md3dDevice->CreateRootSignature(
-        0,
+    ThrowIfFailed(mApp->md3dDevice->CreateRootSignature(0,
         serializedRootSig->GetBufferPointer(),
         serializedRootSig->GetBufferSize(),
-        IID_PPV_ARGS(mRootSignature.GetAddressOf())));
+        IID_PPV_ARGS(&mRootSignature)));
 }
 
 void D3D12RenderAdapter::BuildShadersAndInputLayout()

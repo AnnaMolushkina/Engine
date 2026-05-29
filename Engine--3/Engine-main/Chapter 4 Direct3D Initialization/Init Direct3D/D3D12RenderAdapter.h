@@ -40,6 +40,7 @@ public:
 
     virtual void DrawMesh(const GPUMesh& gpuMesh) override;
     virtual void SetTexture(TextureData* texture) override;
+    virtual void SetShader(std::shared_ptr<ShaderProgram> shader) override;
 
     // Загрузка меша на GPU
     GPUMesh UploadMesh(const MeshData& meshData,
@@ -47,6 +48,7 @@ public:
         ID3D12GraphicsCommandList* cmdList);
 
     bool CreateTexture(TextureData& textureData, ID3D12Device* device, ID3D12GraphicsCommandList* cmdList);
+    bool CreateTexture(TextureData& textureData);  // упрощённая версия
     //поле для хранения шейдерной программы
     std::shared_ptr<ShaderProgram> mShaderProgram;
 
@@ -62,6 +64,10 @@ public:
     void CreateTextureSRV(ComPtr<ID3D12Resource> textureResource, int index = 0);
 
     TextureData* GetMainTexture() { return &m_mainTextureData; }
+
+    bool UploadTextureToGPU(TextureData& textureData);
+
+    std::shared_ptr<ShaderProgram> m_currentShader = nullptr;
 
 private:
     void BuildRootSignature();

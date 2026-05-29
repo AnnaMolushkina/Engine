@@ -31,4 +31,7 @@ public:
 
     // метод для установки текстуры (пока без shared_ptr, используем указатель)
     virtual void SetTexture(TextureData* texture) = 0;
+
+    // Правильная сигнатура:
+    virtual void SetShader(std::shared_ptr<ShaderProgram> shader) = 0;
 };
