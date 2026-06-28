@@ -1,0 +1,34 @@
+[INFO] Application Startup - Game Engine
+[INFO] Initializing D3D12RenderAdapter...
+[INFO] Loading shaders from files...
+[INFO] Shader compiled: Shaders/VertexShader.hlsl
+[INFO] Shader compiled: Shaders/PixelShader.hlsl
+[INFO] Shader program created successfully
+[INFO] Shaders successfully loaded from files.
+[INFO] D3D12RenderAdapter initialized successfully
+[ERROR] Assimp: Failed to load model: assets/models/stepler.obj
+[ERROR] [ResourceManager] Failed to load mesh: assets/models/stepler.obj
+[ERROR] Assimp: Failed to load model: assets/models/cube.obj
+[ERROR] [ResourceManager] Failed to load mesh: assets/models/cube.obj
+[ERROR] stb_image failed to load texture: assets/textures/texture_stepler.jpg
+[ERROR] stb_image failed to load texture: assets/textures/heart.jpg
+[INFO] InitScene completed
+[INFO] Square created with ID: 5
+[INFO] Camera created and stored as pointer
+[INFO] === MAIN MENU ===
+[INFO] Press ENTER to start the game
+[INFO] Press 'W' to toggle Secondary Window
+[INFO] Application successfully initialized. Starting the main Game Loop.
+[INFO] Frame 1 | DeltaTime: 0.000995s
+[INFO] Frame 100 | DeltaTime: 0.007016s
+[INFO] Frame 200 | DeltaTime: 0.006904s
+[INFO] Frame 300 | DeltaTime: 0.006938s
+[INFO] Exiting Main Menu.
+[INFO] === GAMEPLAY ===
+[INFO] LMB: Scale | RMB: Rotate | P: Pause
+[INFO] Press 'W' to toggle Secondary Window
+[INFO] Objects SHOWN (auto)
+[INFO] Frame 400 | DeltaTime: 0.007087s
+[INFO] Frame 500 | DeltaTime: 0.006914s
+[INFO] Application shutdown complete
+[INFO] Exiting Gameplay.
