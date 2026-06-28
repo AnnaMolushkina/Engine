@@ -163,45 +163,80 @@ void Application::InitScene()
     //mrTri.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
     //mrTri.type = PrimitiveType::Triangle;
     //m_world.AddTag(m_rotatingTriangle, "MainWindow");
+   
 
     D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
-    // Загружаем шейдер один раз
-    auto defaultShader = d3d->CreateShaderProgram("Shaders/VertexShader.hlsl", "Shaders/PixelShader.hlsl");
-    // Stepler (используем уже загруженную в Initialize)
-    {
-        auto mesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
 
+    // Загружаем ресурсы 1 раз
+
+    auto steplerMesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
+    auto cubeMesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
+
+    auto steplerTex = ResourceManager::Get().LoadTextureData("assets/textures/texture_stepler.jpg");
+    if (steplerTex && d3d) {
+        d3d->UploadTextureToGPU(*steplerTex);
+    }
+
+    auto heartTex = ResourceManager::Get().LoadTextureData("assets/textures/heart.jpg");
+    if (heartTex && d3d) {
+        d3d->UploadTextureToGPU(*heartTex);
+    }
+
+    // Степлер 1 (слева, уменьшен)
+    {
         Entity e = m_world.CreateEntity();
         Transform& t = m_world.AddTransform(e);
-        t.position = glm::vec3(-1.5f, 0.0f, 0.0f);
+        t.position = glm::vec3(-2.5f, 0.0f, 0.0f);
+        t.scale = glm::vec3(0.4f, 0.4f, 0.4f);
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = mesh;
-        mr.texture = std::shared_ptr<TextureData>(d3d ? d3d->GetMainTexture() : nullptr, [](TextureData*) {});
-        mr.shader = defaultShader;
+        mr.mesh = steplerMesh;         
+        mr.texture = steplerTex;         
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
     }
 
-    // Cube + heart.jpg
+    // Степлер 2 (в центре, стандартный)
     {
-        auto mesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
-        auto tex = ResourceManager::Get().LoadTextureData("assets/textures/heart.jpg");
-
-        if (tex && d3d) {
-            d3d->UploadTextureToGPU(*tex);   // новый метод
-        }
-
         Entity e = m_world.CreateEntity();
         Transform& t = m_world.AddTransform(e);
-        t.position = glm::vec3(1.5f, 0.0f, 0.0f);
-        t.scale = glm::vec3(1.3f);
+        t.position = glm::vec3(0.0f, 0.0f, 0.0f);
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = mesh;
-        mr.texture = tex;
-        mr.shader = defaultShader;
+        mr.mesh = steplerMesh;          
+        mr.texture = steplerTex;         
+        mr.useLoadedMesh = true;
+
+        m_world.AddTag(e, "MainWindow");
+    }
+
+    // Степлер 3 (справа, повернут)
+    {
+        Entity e = m_world.CreateEntity();
+        Transform& t = m_world.AddTransform(e);
+        t.position = glm::vec3(2.5f, 0.0f, 0.0f);
+        t.scale = glm::vec3(0.7f, 0.7f, 0.7f);
+        t.rotation = glm::angleAxis(glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // поворот по Y
+
+        MeshRenderer& mr = m_world.AddMeshRenderer(e);
+        mr.mesh = steplerMesh;          
+        mr.texture = steplerTex;        
+        mr.useLoadedMesh = true;
+
+        m_world.AddTag(e, "MainWindow");
+    }
+
+    // Красный куб
+    {
+        Entity e = m_world.CreateEntity();
+        Transform& t = m_world.AddTransform(e);
+        t.position = glm::vec3(0.0f, -1.0f, -4.0f);
+        t.scale = glm::vec3(1.3f, 1.3f, 1.3f);
+
+        MeshRenderer& mr = m_world.AddMeshRenderer(e);
+        mr.mesh = cubeMesh;
+        mr.texture = heartTex;
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
@@ -209,21 +244,8 @@ void Application::InitScene()
 
     Logger::Info("InitScene completed");
 
-    //// ========== ВЫТЯНУТЫЙ РОМБ ==========
-    //m_circle = m_world.CreateEntity();
-    //Transform& tRhombus = m_world.AddTransform(m_circle);
-    //tRhombus.position = glm::vec3(0.4f, 0.0f, 0.0f);   // ближе к центру
-    //tRhombus.scale = glm::vec3(0.8f, 0.4f, 1.0f);
-    //tRhombus.rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    //m_originalY = 0.0f;
 
-    //MeshRenderer& mrRhombus = m_world.AddMeshRenderer(m_circle);
-    //mrRhombus.color = glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-    //mrRhombus.type = PrimitiveType::Square;
-    //m_world.AddTag(m_circle, "MainWindow");
-
-
-    // ========== КВАДРАТ (второе окно) ==========
+    // Черный квадрат (второе окно)
     Entity squareEntity = m_world.CreateEntity();
     Transform& tSquare = m_world.AddTransform(squareEntity);
     tSquare.position = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -236,13 +258,20 @@ void Application::InitScene()
 
     Logger::Info("Square created with ID: " + std::to_string(m_square));
     
-    // ========== ДОБАВЛЯЕМ КАМЕРУ ==========
-    m_cameraEntity = m_world.CreateEntity();
+    // Камера
+   /* m_cameraEntity = m_world.CreateEntity();
     m_camera = &m_world.AddCamera(m_cameraEntity);
     m_camera->type = CameraType::Perspective;
     m_camera->position = glm::vec3(1.0f, 1.0f, 5.0f);
     m_camera->target = glm::vec3(0.0f, 0.0f, 0.0f);
-    m_camera->zoom = 5.0f;
+    m_camera->zoom = 5.0f;*/
+
+    m_cameraEntity = m_world.CreateEntity();
+    Camera& camera = m_world.AddCamera(m_cameraEntity);
+    camera.type = CameraType::Perspective;
+    camera.position = glm::vec3(0.0f, 2.0f, 6.0f);
+    camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
+    camera.zoom = 6.0f;
 
     Logger::Info("Camera created and stored as pointer");
 
@@ -264,13 +293,13 @@ bool Application::Initialize()
         return false;
     }
 
-    // ========== СОЗДАЁМ RENDER SYSTEM И СЦЕНУ ==========
+    // СОЗДАЁМ RENDER SYSTEM И СЦЕНУ
     m_renderSystem = std::make_unique<RenderSystem>(mRenderAdapter.get());
     InitScene();
 
-    // ========== СОЗДАЁМ CAMERA SYSTEM ==========
-    //m_cameraSystem = std::make_unique<CameraSystem>();
-    // ===========================================
+    // СОЗДАЁМ CAMERA SYSTEM 
+    m_cameraSystem = std::make_unique<CameraSystem>();
+
 
     mStateManager.ChangeState(std::make_shared<MainMenuState>());
 
@@ -350,7 +379,7 @@ void Application::Update(const GameTimer& gt)
         Logger::Info("Frame " + to_string(mFrameCount) + " | DeltaTime: " + to_string(gt.DeltaTime()) + "s");
     }
 
-    // ========== ПЕРЕКЛЮЧЕНИЕ ВТОРОГО ОКНА (W) ==========
+    //  ПЕРЕКЛЮЧЕНИЕ ВТОРОГО ОКНА (W) 
     if (GetAsyncKeyState('W') & 0x8000) {
         Sleep(200);
         mShowSecondaryWnd = !mShowSecondaryWnd;
@@ -375,7 +404,7 @@ void Application::Update(const GameTimer& gt)
         Logger::Info("Objects HIDDEN (auto)");
     }
 
-    // ========== ПОЛУЧАЕМ ДЕЛЬТЫ МЫШИ ==========
+    // ПОЛУЧАЕМ ДЕЛЬТЫ МЫШИ
     static int lastMouseX = 0;
     static int lastMouseY = 0;
     POINT mousePos;
@@ -395,91 +424,75 @@ void Application::Update(const GameTimer& gt)
 
     lastMouseX = mousePos.x;
     lastMouseY = mousePos.y;
-    // ==========================================
 
-    // ========== УПРАВЛЕНИЕ КАМЕРОЙ (СТРЕЛКИ + Q/E) ==========
-
+    // ========== УПРАВЛЕНИЕ КАМЕРОЙ ==========
     if (m_cameraSystem) {
-        m_cameraSystem->Update(gt.DeltaTime(),
-            (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0,   // вращение влево
-            (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0,  // вращение вправо
-            (GetAsyncKeyState(VK_UP) & 0x8000) != 0,     // приближение (вверх)
-            (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0,   // отдаление (вниз)
-            (GetAsyncKeyState('Q') & 0x8000) != 0,       // Q - камера вверх
-            (GetAsyncKeyState('E') & 0x8000) != 0,       // E - камера вниз
-            mouseDeltaX, mouseDeltaY, 0.0f);
+        // Получаем состояние клавиш
+        bool moveForward = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+        bool moveBackward = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+        bool moveLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+        bool moveRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+        bool moveDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
+        bool moveUp = (GetAsyncKeyState('E') & 0x8000) != 0;
+
+        // Получаем позицию мыши
+        POINT currentMousePos;
+        GetCursorPos(&currentMousePos);
+        ScreenToClient(mhMainWnd, &currentMousePos);
+
+        float mouseDeltaX = 0.0f;
+        float mouseDeltaY = 0.0f;
+
+        // ПКМ - вращение
+        bool isRMBPressed = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+        if (isRMBPressed) {
+            if (!m_isRMBDragging) {
+                m_isRMBDragging = true;
+                m_lastMousePos = currentMousePos;
+            }
+            else {
+                mouseDeltaX = static_cast<float>(currentMousePos.x - m_lastMousePos.x);
+                mouseDeltaY = static_cast<float>(currentMousePos.y - m_lastMousePos.y);
+                m_lastMousePos = currentMousePos;
+            }
+        }
+        else {
+            m_isRMBDragging = false;
+        }
+
+        // ЛКМ - приближение/отдаление
+        bool isLMBPressed = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+        float scrollDelta = 0.0f;
+        if (isLMBPressed) {
+            if (!m_isLMBDragging) {
+                m_isLMBDragging = true;
+                m_lastMousePos = currentMousePos;
+            }
+            else {
+                // Движение мыши вверх → приближение
+                scrollDelta = static_cast<float>(m_lastMousePos.y - currentMousePos.y) * 0.05f;
+                m_lastMousePos = currentMousePos;
+            }
+        }
+        else {
+            m_isLMBDragging = false;
+        }
+
+        // Добавляем колесико мыши
+        if (m_scrollDelta != 0.0f) {
+            scrollDelta += m_scrollDelta;
+            m_scrollDelta = 0.0f;
+        }
+
+        // Обновляем камеру
+        m_cameraSystem->Update(m_world, gt.DeltaTime(),
+            moveForward, moveBackward,
+            moveLeft, moveRight,
+            moveUp, moveDown,
+            mouseDeltaX, mouseDeltaY,
+            scrollDelta);
     }
-    // ========================================================
-    // Управление камерой через указатель
-    if (m_camera) {
-        float speed = 3.0f * gt.DeltaTime();
 
-        if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
-            m_camera->position.x -= speed;
-            m_camera->target.x -= speed;
-            //Logger::Info("Camera X: " + std::to_string(m_camera->position.x));
-        }
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
-            m_camera->position.x += speed;
-            m_camera->target.x += speed;
-        }
-        if (GetAsyncKeyState(VK_UP) & 0x8000) {
-            m_camera->position.z -= speed;
-            m_camera->target.z -= speed;
-        }
-        if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
-            m_camera->position.z += speed;
-            m_camera->target.z += speed;
-        }
-    }
-// КЛАВИША '1' - вращение треугольника
-    static bool wasOnePressed = false;
-    bool onePressed = (GetAsyncKeyState('1') & 0x8000);
-
-    if (onePressed && !wasOnePressed) {
-        m_isRotating = !m_isRotating;
-        if (!m_isRotating) {
-            // Сбрасываем угол при остановке (опционально)
-            // m_rotationAngle = 0.0f;
-        }
-        Logger::Info(m_isRotating ? "Triangle Rotation STARTED" : "Triangle Rotation STOPPED");
-    }
-    wasOnePressed = onePressed;
-
-    if (m_showECS && m_isRotating)
-    {
-        m_rotationAngle += gt.DeltaTime() * 1.5f;
-        Transform* t = m_world.GetTransform(m_rotatingTriangle);
-        if (t) {
-            t->rotation = glm::angleAxis(m_rotationAngle, glm::vec3(0.0f, 0.0f, 1.0f));
-        }
-    }
-  
-
-    // КЛАВИША '2' - прыжки ромба
-    static bool wasThreePressed = false;
-    bool threePressed = (GetAsyncKeyState('2') & 0x8000);
-
-    if (threePressed && !wasThreePressed) {
-        m_isJumping = !m_isJumping;
-        if (!m_isJumping) {
-            // Сбрасываем фазу прыжка при остановке
-            m_jumpPhase = 0.0f;
-        }
-        Logger::Info(m_isJumping ? "Rhombus Jumping STARTED" : "Rhombus Jumping STOPPED");
-    }
-    wasThreePressed = threePressed;
-
-    if (m_isJumping)
-    {
-        m_jumpPhase += gt.DeltaTime() * m_jumpSpeed;
-        float newY = m_originalY + sin(m_jumpPhase) * 1.0f;
-
-        Transform* t = m_world.GetTransform(m_circle);
-        if (t) {
-            t->position.y = newY;
-        }
-    }
 
     // ========== ГОРЯЧИЕ КЛАВИШИ ДЛЯ СЕРИАЛИЗАЦИИ ==========
     static bool wasF5Pressed = false;
@@ -501,25 +514,25 @@ void Application::Update(const GameTimer& gt)
 
 void Application::Draw(const GameTimer& gt)
 {
-    /*if (!m_cameraSystem) {
+    if (!m_cameraSystem) {
         Logger::Error("CameraSystem is null!");
-        return;
-    }*/
-
-    /*glm::mat4 view = m_cameraSystem->GetViewMatrix();
-    glm::mat4 proj = m_cameraSystem->GetProjectionMatrix((float)mClientWidth / mClientHeight);
-    glm::vec3 cameraPos = m_cameraSystem->GetCameraPosition();*/
-   
-    // Получаем камеру из World
-    Camera* camera = m_world.GetCamera(m_cameraEntity);
-    if (!camera) {
-        Logger::Error("No camera found!");
         return;
     }
 
-    glm::mat4 view = glm::lookAt(m_camera->position, m_camera->target, glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)mClientWidth / mClientHeight, 0.1f, 100.0f);
-    glm::vec3 cameraPos = m_camera->position;
+    glm::mat4 view = m_cameraSystem->GetViewMatrix();
+    glm::mat4 proj = m_cameraSystem->GetProjectionMatrix((float)mClientWidth / mClientHeight);
+    glm::vec3 cameraPos = m_cameraSystem->GetCameraPosition();
+   
+    //// Получаем камеру из World
+    //Camera* camera = m_world.GetCamera(m_cameraEntity);
+    //if (!camera) {
+    //    Logger::Error("No camera found!");
+    //    return;
+    //}
+
+    //glm::mat4 view = glm::lookAt(m_camera->position, m_camera->target, glm::vec3(0.0f, 1.0f, 0.0f));
+    //glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)mClientWidth / mClientHeight, 0.1f, 100.0f);
+    //glm::vec3 cameraPos = m_camera->position;
 
     mRenderAdapter->BeginFrame(0);
 
@@ -584,17 +597,6 @@ void Application::Draw(const GameTimer& gt)
         }
     }
 
-    //if (m_showECS && m_renderSystem) {
-    //    auto currentState = mStateManager.GetCurrentState();
-    //    if (currentState && dynamic_cast<PlayState*>(currentState.get())) {
-
-    //        m_world.UpdateSpatialGrid();
-
-    //        // Основная отрисовка теперь здесь:
-    //        m_renderSystem->UpdateWithLoadedMeshes(m_world, view, proj);
-    //    }
-    //}
-
     mRenderAdapter->EndFrame(0);
 
     if (mShowSecondaryWnd) {
@@ -637,7 +639,6 @@ void Application::OnMouseMove(WPARAM btnState, int x, int y)
     // mStateManager.OnMouseMove(btnState, x, y);
 }
 
-
 bool D3D12RenderAdapter::Initialize()
 {
     Logger::Info("Initializing D3D12RenderAdapter...");
@@ -649,6 +650,7 @@ bool D3D12RenderAdapter::Initialize()
     BuildGeometry();
     BuildPSO();
 
+
     // Создаём дескрипторный хип для текстур
     D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
     srvHeapDesc.NumDescriptors = 64;
@@ -656,24 +658,6 @@ bool D3D12RenderAdapter::Initialize()
     srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(mApp->md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mTextureSrvHeap)));
     mTextureSrvDescriptorSize = mApp->md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-    // Загружаем текстуру из файла
-    auto texData = TextureData::LoadFromFile("assets/textures/texture_stepler.jpg");
-    if (texData) {
-        m_mainTextureData = *texData;
-        if (CreateTexture(m_mainTextureData, mApp->md3dDevice.Get(), mApp->mCommandList.Get())) {
-            CreateTextureSRV(m_mainTextureData.textureResource, 0);
-            m_currentTexture = &m_mainTextureData;
-            m_mainTextureData.srvIndex = 0;
-            Logger::Info("Main texture loaded and SRV created");
-        }
-        else {
-            Logger::Error("Failed to create GPU texture");
-        }
-    }
-    else {
-        Logger::Error("Failed to load texture from file");
-    }
 
     // Закрываем command list (команды BuildGeometry + копирование текстуры)
     ThrowIfFailed(mApp->mCommandList->Close());

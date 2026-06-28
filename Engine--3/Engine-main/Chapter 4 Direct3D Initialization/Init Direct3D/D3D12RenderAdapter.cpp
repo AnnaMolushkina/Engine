@@ -29,34 +29,31 @@ GPUMesh D3D12RenderAdapter::UploadMesh(const MeshData& meshData,
     }
 
     const SubMesh& subMesh = meshData.subMeshes[0];
-    GPUMesh gpuMesh;
 
+    GPUMesh gpuMesh;
     gpuMesh.IndexCount = static_cast<UINT>(subMesh.indices.size());
 
-    // === Vertex Buffer ===
     const UINT vbByteSize = static_cast<UINT>(subMesh.vertices.size() * sizeof(Vertex3D));
     gpuMesh.VertexBuffer = d3dUtil::CreateDefaultBuffer(
-        device, cmdList, subMesh.vertices.data(), vbByteSize, mVertexBufferUploader);
+        device, cmdList,
+        subMesh.vertices.data(), vbByteSize,
+        mVertexBufferUploader);
 
-    // === Index Buffer ===
     const UINT ibByteSize = static_cast<UINT>(subMesh.indices.size() * sizeof(uint32_t));
-
     gpuMesh.IndexBuffer = d3dUtil::CreateDefaultBuffer(
-        device, cmdList, subMesh.indices.data(), ibByteSize, mIndexBufferUploader);
+        device, cmdList,
+        subMesh.indices.data(), ibByteSize,
+        mIndexBufferUploader);
 
-    // Vertex Buffer View
     gpuMesh.VBV.BufferLocation = gpuMesh.VertexBuffer->GetGPUVirtualAddress();
     gpuMesh.VBV.StrideInBytes = sizeof(Vertex3D);
     gpuMesh.VBV.SizeInBytes = vbByteSize;
 
-    // Index Buffer View — ВАЖНО: используем R32_UINT, т.к. индексы uint32_t
     gpuMesh.IBV.BufferLocation = gpuMesh.IndexBuffer->GetGPUVirtualAddress();
-    gpuMesh.IBV.Format = DXGI_FORMAT_R32_UINT;        //  было R16_UINT — ошибка!
+    gpuMesh.IBV.Format = DXGI_FORMAT_R32_UINT;
     gpuMesh.IBV.SizeInBytes = ibByteSize;
 
-    Logger::Info("GPU Upload successful: " + meshData.filePath
-        + " | Indices: " + std::to_string(gpuMesh.IndexCount));
-
+    Logger::Info("GPU Upload successful: " + meshData.filePath);
     return gpuMesh;
 }
 
@@ -200,12 +197,6 @@ std::shared_ptr<ShaderProgram> D3D12RenderAdapter::CreateShaderProgram(const std
 
 void D3D12RenderAdapter::SetTexture(TextureData* texture) {
     m_currentTexture = texture;
-    if (texture && texture->textureResource) {
-        Logger::Info("SetTexture: texture \"" + texture->filePath + "\" will be used");
-    }
-    else {
-        Logger::Info("SetTexture: no texture");
-    }
 }
 
 void D3D12RenderAdapter::DrawMesh(const GPUMesh& gpuMesh) {
@@ -215,27 +206,21 @@ void D3D12RenderAdapter::DrawMesh(const GPUMesh& gpuMesh) {
 
     auto cmdList = mApp->mCommandList;
 
-    if (m_currentShader && m_currentShader->IsValid()) {
-        cmdList->SetPipelineState(mPSO.Get()); // или переключай PSO, если несколько шейдеров
-    }
-
     cmdList->SetGraphicsRootSignature(mRootSignature.Get());
 
     if (m_currentTexture && m_currentTexture->srvIndex >= 0)
     {
-        // Устанавливаем дескрипторный хип
+        // Устанавливаем дескриптор хип
         ID3D12DescriptorHeap* heaps[] = { mTextureSrvHeap.Get() };
         cmdList->SetDescriptorHeaps(_countof(heaps), heaps);
 
         CD3DX12_GPU_DESCRIPTOR_HANDLE texHandle(
             mTextureSrvHeap->GetGPUDescriptorHandleForHeapStart(),
-            m_currentTexture->srvIndex,        // правильный индекс!
+            m_currentTexture->srvIndex,  
             mTextureSrvDescriptorSize);
 
         cmdList->SetGraphicsRootDescriptorTable(1, texHandle);
 
-        Logger::Info("DrawMesh: SUCCESS using SRV index " + std::to_string(m_currentTexture->srvIndex)
-            + " for texture " + m_currentTexture->filePath);
     }
     else
     {
@@ -323,9 +308,4 @@ bool D3D12RenderAdapter::UploadTextureToGPU(TextureData& textureData)
     }
 
     return success;
-}
-
-void D3D12RenderAdapter::SetShader(std::shared_ptr<ShaderProgram> shader)
-{
-    m_currentShader = shader ? shader : mShaderProgram;
 }

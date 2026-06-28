@@ -24,7 +24,6 @@ public:
     void LoadScene(const std::string& filename);
 
     virtual bool Initialize() override;
-    virtual void OnMouseWheel(float delta) {}
 
     // Публичные методы для доступа из D3D12RenderAdapter
     ID3D12Device* GetDevice() const { return md3dDevice.Get(); }
@@ -36,11 +35,8 @@ private:
     bool m_showECS = false;
     float m_mouseDeltaX = 0.0f;
     float m_mouseDeltaY = 0.0f;
-    float m_scrollDelta = 0.0f;
     int m_lastMouseX = 0;
     int m_lastMouseY = 0;
-
-    std::unique_ptr<CameraSystem> m_cameraSystem;
 
     virtual void OnResize() override;
     virtual void Update(const GameTimer& gt) override;
@@ -49,6 +45,7 @@ private:
     virtual void OnMouseDown(WPARAM btnState, int x, int y) override;
     virtual void OnMouseUp(WPARAM btnState, int x, int y) override;
     virtual void OnMouseMove(WPARAM btnState, int x, int y) override;
+
     void CreateSecondaryWindow();
     void CreateSecondarySwapChain();
     void InitScene();
@@ -67,6 +64,9 @@ private:
     // ECS поля
     World m_world;
     std::unique_ptr<RenderSystem> m_renderSystem;
+    std::unique_ptr<CameraSystem> m_cameraSystem;
+    Entity m_cameraEntity;  // ID сущности камеры
+
     Entity m_rotatingTriangle;
     Entity m_square;
 
@@ -80,13 +80,19 @@ private:
     float m_jumpSpeed = 3.0f;
     float m_originalY = 0.0f;
 
-    glm::vec3 m_cameraPos = glm::vec3(0.0f, 0.0f, -5.0f);
+    //glm::vec3 m_cameraPos = glm::vec3(0.0f, 0.0f, -5.0f);
     glm::vec3 m_cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-    float m_cameraZoom = 5.0f;
-    float m_cameraAngleX = 0.0f;
+    //float m_cameraZoom = 5.0f;
+   // float m_cameraAngleX = 0.0f;
     float m_rotationAngle = 0.0f;
     float m_jumpPhase = 0.0f;
     bool m_isRotating = false;
-    Camera* m_camera = nullptr;  // указатель на камеру
-    Entity m_cameraEntity;  // хранение ID сущности камеры
+    //Camera* m_camera = nullptr;  // указатель на камеру
+
+
+    // Для мыши
+    POINT m_lastMousePos = { 0, 0 };
+    bool m_isLMBDragging = false;
+    bool m_isRMBDragging = false;
+    float m_scrollDelta = 0.0f;
 };

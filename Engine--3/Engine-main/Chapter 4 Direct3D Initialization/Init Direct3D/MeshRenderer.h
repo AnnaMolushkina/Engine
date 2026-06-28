@@ -6,7 +6,6 @@
 // Forward declaration
 struct TextureData;
 struct MeshData;
-struct ShaderProgram;
 
 enum class PrimitiveType {
     Triangle,
@@ -27,6 +26,4 @@ struct MeshRenderer : public Component {
 
     //текстура для этого объекта
     std::shared_ptr<TextureData> texture = nullptr;
-
-    std::shared_ptr<ShaderProgram> shader = nullptr;
 };

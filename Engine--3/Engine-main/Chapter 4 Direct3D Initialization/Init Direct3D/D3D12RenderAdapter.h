@@ -40,7 +40,6 @@ public:
 
     virtual void DrawMesh(const GPUMesh& gpuMesh) override;
     virtual void SetTexture(TextureData* texture) override;
-    virtual void SetShader(std::shared_ptr<ShaderProgram> shader) override;
 
     // Загрузка меша на GPU
     GPUMesh UploadMesh(const MeshData& meshData,
@@ -66,8 +65,6 @@ public:
     TextureData* GetMainTexture() { return &m_mainTextureData; }
 
     bool UploadTextureToGPU(TextureData& textureData);
-
-    std::shared_ptr<ShaderProgram> m_currentShader = nullptr;
 
 private:
     void BuildRootSignature();
@@ -111,4 +108,5 @@ private:
     TextureData* m_currentTexture = nullptr;  // Текущая текстура для отрисовки
 
     TextureData m_mainTextureData;
+
 };
