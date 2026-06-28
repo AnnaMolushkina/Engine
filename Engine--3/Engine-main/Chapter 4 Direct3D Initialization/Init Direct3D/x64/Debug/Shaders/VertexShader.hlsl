@@ -1,24 +1,37 @@
-struct VSInput
-{
-    float3 Pos : POSITION;
-    float4 Color : COLOR;
-};
-
-struct VSOutput
-{
-    float4 Pos : SV_POSITION;
-    float4 Color : COLOR;
-};
-
 cbuffer cbPerObject : register(b0)
 {
-    float4x4 gWorldViewProj;
+    float4x4 gWorld;
+    float4x4 gView;
+    float4x4 gProj;
 };
 
-VSOutput main(VSInput vin)
+struct VertexIn
 {
-    VSOutput vout;
-    vout.Pos = mul(float4(vin.Pos, 1.0f), gWorldViewProj);
+    float3 PosL : POSITION;
+    float4 Color : COLOR;
+    float2 TexCoord : TEXCOORD;
+};
+
+struct VertexOut
+{
+    float4 PosH : SV_POSITION;
+    float4 Color : COLOR;
+    float2 TexCoord : TEXCOORD;
+};
+
+VertexOut main(VertexIn vin)
+{
+    VertexOut vout;
+    
+    // Вычисляем позицию в мировых координатах
+    float4 worldPos = mul(float4(vin.PosL, 1.0f), gWorld);
+    // Переводим в видовые координаты
+    float4 viewPos = mul(worldPos, gView);
+    // Переводим в проекционные координаты
+    vout.PosH = mul(viewPos, gProj);
+    
+    // Передаем цвет дальше
     vout.Color = vin.Color;
+    vout.TexCoord = vin.TexCoord;
     return vout;
 }
