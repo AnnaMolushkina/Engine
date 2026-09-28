@@ -52,13 +52,13 @@ struct SpatialGrid {
         }
     }
 
-    // Метод для очистки сетки
+    // РњРµС‚РѕРґ РґР»СЏ РѕС‡РёСЃС‚РєРё СЃРµС‚РєРё
     void Clear() {
         grid.clear();
         entityCell.clear();
     }
 
-    // Метод для добавления сущности напрямую
+    // РњРµС‚РѕРґ РґР»СЏ РґРѕР±Р°РІР»РµРЅРёСЏ СЃСѓС‰РЅРѕСЃС‚Рё РЅР°РїСЂСЏРјСѓСЋ
     void AddEntity(Entity e, const glm::vec3& position) {
         std::string key = GetCellKey(position.x, position.z);
         grid[key].push_back(e);

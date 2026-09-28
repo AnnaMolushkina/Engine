@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "engine",
+  "version-string": "0.4.0",
+  "description": "DirectX 12 учебный движок: ECS, ресурсы (Assimp, stb_image), job system (enkiTS), профилирование (Tracy)",
+  "dependencies": [
+    "assimp",
+    "enkits",
+    "glm",
+    "nlohmann-json",
+    "stb",
+    {
+      "name": "tracy",
+      "features": [ "on-demand" ]
+    }
+  ],
+  "builtin-baseline": "07f4812200df3d3c931c0c8a6081d3b21fe2bf9f"
+}

@@ -1,3 +1,18 @@
+# Сборка CMake / vcpkg
+out/
+build/
+vcpkg_installed/
+
+# Visual Studio
+*.vs
+.vs/
+x64/
+*.suo
+*.user
+
+# Логи движка (результаты замеров bench_*.csv и трейсы *.tracy - артефакты сдачи, их не игнорируем)
+engine.log
+
 # Prerequisites
 *.d
 
@@ -5,6 +20,7 @@
 *.slo
 *.lo
 *.o
+*.obj
 
 # Precompiled Headers
 *.gch
@@ -15,10 +31,13 @@
 
 # Debugger Files
 *.pdb
+*.idb
+*.tlog
 
 # Compiled Dynamic libraries
 *.so
 *.dylib
+*.dll
 
 # Fortran module files
 *.mod
@@ -37,6 +56,3 @@
 
 # debug information files
 *.dwo
-
-*.vs
-.vs/

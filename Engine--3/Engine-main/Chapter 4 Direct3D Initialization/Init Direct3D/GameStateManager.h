@@ -3,88 +3,102 @@
 #include <windows.h>
 #include "GameState.h"
 #include <memory>
-#include <stack>
+#include <vector>
 
+// Стек состояний игры. Переходы (Push/Pop/Change/Clear) откладываются и применяются после Update:
+// раньше ChangeState/ClearStates удаляли состояние прямо посреди его собственного Update()
+// (объект уничтожался, пока выполнялся его метод).
 class GameStateManager {
 public:
     GameStateManager() = default;
-    ~GameStateManager() {
-        while (!mStateStack.empty()) {
-            mStateStack.top()->OnExit();
-            mStateStack.pop();
-        }
-    }
+    ~GameStateManager() { Shutdown(); }
 
-    void PushState(std::shared_ptr<GameState> state) {
-        if (!mStateStack.empty()) {
-            // Optional: pause current state
-        }
-        mStateStack.push(state);
-        mStateStack.top()->OnEnter();
-    }
-
-    void PopState() {
-        if (!mStateStack.empty()) {
-            mStateStack.top()->OnExit();
-            mStateStack.pop();
-        }
-        if (!mStateStack.empty()) {
-            // Optional: resume new top state
-        }
-    }
-
-    void ChangeState(std::shared_ptr<GameState> state) {
-        if (!mStateStack.empty()) {
-            mStateStack.top()->OnExit();
-            mStateStack.pop();
-        }
-        mStateStack.push(state);
-        mStateStack.top()->OnEnter();
-    }
+    void PushState(std::shared_ptr<GameState> state) { mPending.push_back({ Op::Push, std::move(state) }); }
+    void PopState() { mPending.push_back({ Op::Pop, nullptr }); }
+    void ChangeState(std::shared_ptr<GameState> state) { mPending.push_back({ Op::Change, std::move(state) }); }
 
     // Очистить весь стек состояний
-    void ClearStates() {
-        while (!mStateStack.empty()) {
-            mStateStack.top()->OnExit();
-            mStateStack.pop();
-        }
-    }
+    void ClearStates() { mPending.push_back({ Op::Clear, nullptr }); }
 
-    // ========== ДОБАВИТЬ ЭТОТ МЕТОД ==========
     std::shared_ptr<GameState> GetCurrentState() const {
-        if (mStateStack.empty()) return nullptr;
-        return mStateStack.top();
+        if (mStack.empty()) return nullptr;
+        return mStack.back();
     }
-    // ========================================
 
     void Update(const GameTimer& gt) {
-        if (!mStateStack.empty()) {
-            mStateStack.top()->Update(gt, this);
+        if (!mStack.empty()) {
+            std::shared_ptr<GameState> top = mStack.back(); // держим живым до конца Update
+            top->Update(gt, this);
         }
+        ApplyPending();
     }
 
     void Draw(const GameTimer& gt, class RenderAdapter* renderer) {
-        if (!mStateStack.empty()) {
-            mStateStack.top()->Draw(gt, renderer);
-        }
+        if (!mStack.empty()) mStack.back()->Draw(gt, renderer);
     }
 
     void OnMouseDown(WPARAM btnState, int x, int y) {
-        if (!mStateStack.empty()) mStateStack.top()->OnMouseDown(btnState, x, y);
+        if (!mStack.empty()) mStack.back()->OnMouseDown(btnState, x, y);
     }
 
     void OnMouseUp(WPARAM btnState, int x, int y) {
-        if (!mStateStack.empty()) mStateStack.top()->OnMouseUp(btnState, x, y);
+        if (!mStack.empty()) mStack.back()->OnMouseUp(btnState, x, y);
     }
 
     void OnMouseMove(WPARAM btnState, int x, int y) {
-        if (!mStateStack.empty()) mStateStack.top()->OnMouseMove(btnState, x, y);
+        if (!mStack.empty()) mStack.back()->OnMouseMove(btnState, x, y);
     }
 
     void ProcessKeyboardInput(const GameTimer& gt) {
-        if (!mStateStack.empty()) mStateStack.top()->ProcessKeyboardInput(gt);
+        if (!mStack.empty()) mStack.back()->ProcessKeyboardInput(gt);
+        ApplyPending();
+    }
+
+    // Применить отложенные переходы (вызывается сам после Update; снаружи - после первого ChangeState)
+    void ApplyPending() {
+        while (!mPending.empty()) {
+            std::vector<PendingOp> ops;
+            ops.swap(mPending);
+            for (PendingOp& op : ops) {
+                switch (op.op) {
+                case Op::Push:
+                    mStack.push_back(op.state);
+                    op.state->OnEnter();
+                    break;
+                case Op::Pop:
+                    if (!mStack.empty()) PopTop();
+                    break;
+                case Op::Change:
+                    if (!mStack.empty()) PopTop();
+                    mStack.push_back(op.state);
+                    op.state->OnEnter();
+                    break;
+                case Op::Clear:
+                    while (!mStack.empty()) PopTop();
+                    break;
+                }
+            }
+        }
+    }
+
+    void Shutdown() {
+        mPending.clear();
+        while (!mStack.empty()) PopTop();
     }
 
 private:
-    std::stack<std::shared_ptr<GameState>> mStateStack;
+    enum class Op { Push, Pop, Change, Clear };
+    struct PendingOp {
+        Op op;
+        std::shared_ptr<GameState> state;
+    };
+
+    void PopTop() {
+        std::shared_ptr<GameState> state = mStack.back();
+        state->OnExit();
+        mStack.pop_back();
+    }
+
+    std::vector<std::shared_ptr<GameState>> mStack;
+    std::vector<PendingOp> mPending;
 };

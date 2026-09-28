@@ -10,6 +10,7 @@
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <unordered_set>
 
 class World {
 public:
@@ -28,6 +29,26 @@ public:
         entities.erase(std::remove(entities.begin(), entities.end(), e), entities.end());
     }
 
+    // Пакетное удаление: один проход по списку сущностей вместо прохода на каждую
+    // (DestroyEntity в цикле для тысяч объектов стресс-сцены - O(N^2), секунды)
+    void DestroyEntities(const std::vector<Entity>& toDestroy) {
+        if (toDestroy.empty()) return;
+        std::unordered_set<Entity> doomed(toDestroy.begin(), toDestroy.end());
+        for (Entity e : toDestroy) {
+            transforms.erase(e);
+            meshes.erase(e);
+            tags.erase(e);
+            cameras.erase(e);
+            m_spatialGrid.RemoveEntity(e);
+        }
+        entities.erase(std::remove_if(entities.begin(), entities.end(),
+                                      [&](Entity e) { return doomed.count(e) != 0; }),
+                       entities.end());
+    }
+
+    // Все сущности (снапшот для систем, которые режут его на диапазоны для job system)
+    const std::vector<Entity>& GetEntities() const { return entities; }
+
     // Transform
     Transform& AddTransform(Entity e) {
         Transform& t = transforms[e];
@@ -40,12 +61,24 @@ public:
         return (it != transforms.end()) ? &it->second : nullptr;
     }
 
+    // const-версии: только чтение хеш-таблиц, их безопасно вызывать из нескольких задач сразу
+    // (пока никто не добавляет и не удаляет компоненты)
+    const Transform* GetTransform(Entity e) const {
+        auto it = transforms.find(e);
+        return (it != transforms.end()) ? &it->second : nullptr;
+    }
+
     // MeshRenderer
     MeshRenderer& AddMeshRenderer(Entity e) {
         return meshes[e];
     }
 
     MeshRenderer* GetMeshRenderer(Entity e) {
+        auto it = meshes.find(e);
+        return (it != meshes.end()) ? &it->second : nullptr;
+    }
+
+    const MeshRenderer* GetMeshRenderer(Entity e) const {
         auto it = meshes.find(e);
         return (it != meshes.end()) ? &it->second : nullptr;
     }
@@ -61,6 +94,11 @@ public:
         return (it != tags.end()) ? &it->second : nullptr;
     }
 
+    const Tag* GetTag(Entity e) const {
+        auto it = tags.find(e);
+        return (it != tags.end()) ? &it->second : nullptr;
+    }
+
     // Camera
     Camera& AddCamera(Entity e) {
         return cameras[e];
@@ -71,7 +109,7 @@ public:
         return (it != cameras.end()) ? &it->second : nullptr;
     }
 
-    // �������� ��� �������� � ������� ���� Transform � MeshRenderer
+    // Получить все сущности у которых есть Transform и MeshRenderer
     std::vector<Entity> GetRenderableEntities() const {
         std::vector<Entity> result;
         for (Entity e : entities) {
@@ -96,7 +134,7 @@ public:
         return result;
     }
 
-    // ========== ������ ��� ���������������� ����� ==========
+    // ========== МЕТОДЫ ДЛЯ ПРОСТРАНСТВЕННОЙ СЕТКИ ==========
     void UpdateSpatialGrid() {
         m_spatialGrid.Clear();
         auto ents = GetRenderableEntities();

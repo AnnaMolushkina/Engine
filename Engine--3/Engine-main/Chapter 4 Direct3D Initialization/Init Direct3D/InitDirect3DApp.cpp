@@ -23,57 +23,139 @@
 #include <DirectXMath.h>
 #include "SceneSerializer.h"
 #include "ResourceManager.h"
-#include "MeshData.h"     
+#include "MeshData.h"
 #include "TextureData.h"
+#include "Input.h"
+#include "Profiler.h"
+#include "CrashHandler.h"
+#include <shellapi.h>
+#include <windowsx.h>
+#include <cmath>
+#include <exception>
+#include <random>
 
 using Microsoft::WRL::ComPtr;
 using namespace std;
 using namespace DirectX;
 
-// Предварительное объявление оконной процедуры
-LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+namespace {
+
+constexpr uint32_t kMainThreadJobsPerFrame = 8; // лимит пампа главного потока на кадр
+constexpr wchar_t kSecondaryWindowClass[] = L"SecondaryWnd";
+
+std::vector<std::string> GetCommandLineArgs() {
+    std::vector<std::string> args;
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!argv) return args;
+    for (int i = 1; i < argc; ++i)
+        args.push_back(Logger::ToUtf8(argv[i]));
+    LocalFree(argv);
+    return args;
+}
+
+// config.json, шейдеры, ассеты и engine.log - рядом с exe, откуда бы его ни запустили
+void SetWorkingDirectoryToExe() {
+    wchar_t path[MAX_PATH];
+    const DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    if (length == 0 || length == MAX_PATH) return;
+    std::wstring dir(path, length);
+    const size_t slash = dir.find_last_of(L"\\/");
+    if (slash != std::wstring::npos)
+        SetCurrentDirectoryW(dir.substr(0, slash).c_str());
+}
+
+const char* StateName(const std::shared_ptr<GameState>& state) {
+    if (!state) return "None";
+    if (dynamic_cast<PlayState*>(state.get())) return "Play";
+    if (dynamic_cast<PauseState*>(state.get())) return "Pause";
+    if (dynamic_cast<MainMenuState*>(state.get())) return "MainMenu (Enter - start)";
+    return "?";
+}
+
+} // namespace
 
 // Главная точка входа
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
 {
-#if defined(DEBUG) | defined(_DEBUG)
+#if defined(_MSC_VER) && (defined(DEBUG) || defined(_DEBUG))
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
+    SetWorkingDirectoryToExe();
     Logger::Init();
+    CrashHandler::Install();
     Logger::Info("Application Startup - Game Engine");
 
+    ConfigManager::Get().Load("config.json");
+    ConfigManager::Get().ApplyCommandLine(GetCommandLineArgs());
+
+    int exitCode = 0;
     try
     {
         Application theApp(hInstance);
         if (!theApp.Initialize())
         {
             Logger::Error("Failed to initialize the application.");
-            return 0;
+            exitCode = 1;
         }
-
-        Logger::Info("Application successfully initialized. Starting the main Game Loop.");
-        return theApp.Run();
+        else
+        {
+            Logger::Info("Application successfully initialized. Starting the main Game Loop.");
+            exitCode = theApp.Run();
+        }
     }
     catch (DxException& e)
     {
         Logger::Error(e.ToString());
-        return 0;
+        MessageBoxW(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
+        exitCode = 1;
     }
+    catch (const std::exception& e)
+    {
+        Logger::Error(std::string("Unhandled exception: ") + e.what());
+        exitCode = 1;
+    }
+
+    Logger::Info("Application exited with code " + std::to_string(exitCode));
+    Logger::Shutdown();
+    return exitCode;
 }
 
 Application::Application(HINSTANCE hInstance)
     : D3DApp(hInstance)
 {
+    mMainWndCaption = L"Engine";
 }
 
 Application::~Application()
 {
-    // Дожидаемся завершения всех команд перед разрушением
-    FlushCommandQueue();
-
+    Shutdown();
     Logger::Info("Application shutdown complete");
 }
 
+void Application::Shutdown()
+{
+    if (mShutDown) return;
+    mShutDown = true;
+    Logger::Info("Application shutdown...");
+
+    // Порядок важен: сначала фоновые задачи (они могут ссылаться на мир и ресурсы),
+    // потом состояния и мир, потом GPU-ресурсы
+    mJobs.Shutdown();
+    mStateManager.Shutdown();
+    m_stress = StressScene{};
+    if (md3dDevice) FlushCommandQueue();
+    ResourceManager::Get().Clear();
+    if (mRenderAdapter) {
+        mRenderAdapter->Shutdown();
+        mRenderAdapter.reset();
+    }
+    if (mhSecondaryWnd) {
+        SetWindowLongPtrW(mhSecondaryWnd, GWLP_USERDATA, 0);
+        DestroyWindow(mhSecondaryWnd);
+        mhSecondaryWnd = nullptr;
+    }
+}
 
 void Application::SaveScene(const std::string& filename) {
     // Сохраняем текущую позицию Y ромба
@@ -92,6 +174,9 @@ void Application::SaveScene(const std::string& filename) {
 }
 
 void Application::LoadScene(const std::string& filename) {
+    // Загрузка сцены удаляет все сущности - стресс-сцену убираем заранее (у неё есть указатели на Transform)
+    DespawnStressScene();
+
     // Останавливаем анимации
     m_isRotating = false;
     m_isScaling = false;
@@ -149,28 +234,18 @@ void Application::LoadScene(const std::string& filename) {
 void Application::InitScene()
 {
     // Очищаем старые сущности
-    auto oldEntities = m_world.GetRenderableEntities();
-    for (Entity e : oldEntities) {
-        m_world.DestroyEntity(e);
-    }
-
-    //// ========== ТРЕУГОЛЬНИК ==========
-    //m_rotatingTriangle = m_world.CreateEntity();
-    //Transform& tTri = m_world.AddTransform(m_rotatingTriangle);
-    //tTri.position = glm::vec3(0.0f, 0.0f, 0.0f);  // ближе к центру
-    //tTri.scale = glm::vec3(0.8f, 0.8f, 1.0f);      // чуть меньше
-    //MeshRenderer& mrTri = m_world.AddMeshRenderer(m_rotatingTriangle);
-    //mrTri.color = glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
-    //mrTri.type = PrimitiveType::Triangle;
-    //m_world.AddTag(m_rotatingTriangle, "MainWindow");
-   
+    m_world.DestroyEntities(m_world.GetRenderableEntities());
 
     D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
 
-    // Загружаем ресурсы 1 раз
-
+    // Загружаем ресурсы 1 раз и сразу отправляем на GPU
+    // (раньше меши грузились на GPU прямо посреди кадра, внутри Draw)
     auto steplerMesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
     auto cubeMesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
+    if (d3d) {
+        if (steplerMesh) d3d->UploadMeshToGPU(*steplerMesh);
+        if (cubeMesh) d3d->UploadMeshToGPU(*cubeMesh);
+    }
 
     auto steplerTex = ResourceManager::Get().LoadTextureData("assets/textures/texture_stepler.jpg");
     if (steplerTex && d3d) {
@@ -190,8 +265,8 @@ void Application::InitScene()
         t.scale = glm::vec3(0.4f, 0.4f, 0.4f);
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = steplerMesh;         
-        mr.texture = steplerTex;         
+        mr.mesh = steplerMesh;
+        mr.texture = steplerTex;
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
@@ -204,8 +279,8 @@ void Application::InitScene()
         t.position = glm::vec3(0.0f, 0.0f, 0.0f);
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = steplerMesh;          
-        mr.texture = steplerTex;         
+        mr.mesh = steplerMesh;
+        mr.texture = steplerTex;
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
@@ -220,8 +295,8 @@ void Application::InitScene()
         t.rotation = glm::angleAxis(glm::radians(60.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // поворот по Y
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = steplerMesh;          
-        mr.texture = steplerTex;        
+        mr.mesh = steplerMesh;
+        mr.texture = steplerTex;
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
@@ -244,7 +319,6 @@ void Application::InitScene()
 
     Logger::Info("InitScene completed");
 
-
     // Черный квадрат (второе окно)
     Entity squareEntity = m_world.CreateEntity();
     Transform& tSquare = m_world.AddTransform(squareEntity);
@@ -257,14 +331,6 @@ void Application::InitScene()
     m_square = squareEntity;
 
     Logger::Info("Square created with ID: " + std::to_string(m_square));
-    
-    // Камера
-   /* m_cameraEntity = m_world.CreateEntity();
-    m_camera = &m_world.AddCamera(m_cameraEntity);
-    m_camera->type = CameraType::Perspective;
-    m_camera->position = glm::vec3(1.0f, 1.0f, 5.0f);
-    m_camera->target = glm::vec3(0.0f, 0.0f, 0.0f);
-    m_camera->zoom = 5.0f;*/
 
     m_cameraEntity = m_world.CreateEntity();
     Camera& camera = m_world.AddCamera(m_cameraEntity);
@@ -273,13 +339,19 @@ void Application::InitScene()
     camera.target = glm::vec3(0.0f, 0.0f, 0.0f);
     camera.zoom = 6.0f;
 
-    Logger::Info("Camera created and stored as pointer");
-
+    Logger::Info("Camera created");
 }
 
 bool Application::Initialize()
 {
-    ConfigManager::Get().Load("config.json");
+    ZoneScopedN("Application::Initialize");
+    const EngineConfig& config = ConfigManager::Get().Config();
+
+    // Job system - первой: остальным подсистемам она может понадобиться уже при инициализации
+    JobSystemConfig jobsConfig;
+    jobsConfig.parallelEnabled = config.jobsEnabled;
+    jobsConfig.workerThreads = config.workerThreads;
+    mJobs.Initialize(jobsConfig);
 
     if (!D3DApp::Initialize())
         return false;
@@ -292,25 +364,40 @@ bool Application::Initialize()
     {
         return false;
     }
+    mRenderAdapter->SetVSync(config.vsync);
 
     // СОЗДАЁМ RENDER SYSTEM И СЦЕНУ
     m_renderSystem = std::make_unique<RenderSystem>(mRenderAdapter.get());
     InitScene();
 
-    // СОЗДАЁМ CAMERA SYSTEM 
+    // СОЗДАЁМ CAMERA SYSTEM
     m_cameraSystem = std::make_unique<CameraSystem>();
 
-
-    mStateManager.ChangeState(std::make_shared<MainMenuState>());
+    mBenchmark.Configure(config);
+    if (config.benchmark) {
+        // Замер: сразу игра с "замерочной" сценой, камера неподвижна
+        mStateManager.ChangeState(std::make_shared<PlayState>());
+        SpawnStressScene(config.stressEntities);
+        mBenchmark.Arm(mJobs.IsParallelEnabled(), mJobs.IsParallelEnabled() ? mJobs.ThreadCount() : 1u,
+                       (uint32_t)m_world.GetEntities().size());
+    }
+    else {
+        mStateManager.ChangeState(std::make_shared<MainMenuState>());
+        if (config.stressOnStart) SpawnStressScene(config.stressEntities);
+    }
+    mStateManager.ApplyPending();
+    UpdateCaption();
 
     return true;
 }
+
+// ============================================================ окна
 
 void Application::CreateSecondaryWindow()
 {
     WNDCLASSW wc = { 0 };
     wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = MainWndProc;
+    wc.lpfnWndProc = SecondaryWndProc; // своя процедура: раньше сообщения второго окна шли в D3DApp::MsgProc
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.hInstance = mhAppInst;
@@ -318,12 +405,19 @@ void Application::CreateSecondaryWindow()
     wc.hCursor = LoadCursor(0, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);
     wc.lpszMenuName = 0;
-    wc.lpszClassName = L"SecondaryWnd";
+    wc.lpszClassName = kSecondaryWindowClass;
 
     RegisterClassW(&wc);
 
-    mhSecondaryWnd = CreateWindowW(L"SecondaryWnd", L"Secondary Window (Square)",
-        WS_OVERLAPPEDWINDOW, 100, 100, 400, 400, 0, 0, mhAppInst, 0);
+    RECT rect = { 0, 0, (LONG)mSecondaryWidth, (LONG)mSecondaryHeight }; // клиентская область 400x400
+    AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
+    mhSecondaryWnd = CreateWindowW(kSecondaryWindowClass, L"Secondary Window (Square)",
+        WS_OVERLAPPEDWINDOW, 100, 100, rect.right - rect.left, rect.bottom - rect.top, 0, 0, mhAppInst, this);
+
+    RECT client;
+    GetClientRect(mhSecondaryWnd, &client);
+    mSecondaryWidth = (UINT)std::max<LONG>(1, client.right - client.left);
+    mSecondaryHeight = (UINT)std::max<LONG>(1, client.bottom - client.top);
 
     ShowWindow(mhSecondaryWnd, SW_HIDE);
     UpdateWindow(mhSecondaryWnd);
@@ -338,9 +432,14 @@ void Application::CreateSecondarySwapChain()
     rtvHeapDesc.NodeMask = 0;
     ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(mSecondaryRtvHeap.GetAddressOf())));
 
+    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+    dsvHeapDesc.NumDescriptors = 1;
+    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(mSecondaryDsvHeap.GetAddressOf())));
+
     DXGI_SWAP_CHAIN_DESC sd;
-    sd.BufferDesc.Width = 400;
-    sd.BufferDesc.Height = 400;
+    sd.BufferDesc.Width = mSecondaryWidth;   // раньше 400x400 при клиентской области меньше 400x400
+    sd.BufferDesc.Height = mSecondaryHeight;
     sd.BufferDesc.RefreshRate.Numerator = 60;
     sd.BufferDesc.RefreshRate.Denominator = 1;
     sd.BufferDesc.Format = mBackBufferFormat;
@@ -353,7 +452,7 @@ void Application::CreateSecondarySwapChain()
     sd.OutputWindow = mhSecondaryWnd;
     sd.Windowed = true;
     sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    sd.Flags = SwapChainFlags(); // должны совпадать с ResizeBuffers
 
     ThrowIfFailed(mdxgiFactory->CreateSwapChain(mCommandQueue.Get(), &sd, mSecondarySwapChain.GetAddressOf()));
 
@@ -364,6 +463,136 @@ void Application::CreateSecondarySwapChain()
         md3dDevice->CreateRenderTargetView(mSecondarySwapChainBuffer[i].Get(), nullptr, rtvHandle);
         rtvHandle.Offset(1, mRtvDescriptorSize);
     }
+    CreateSecondaryDepthBuffer();
+}
+
+// Свой буфер глубины второго окна (раньше использовался буфер главного окна другого размера)
+void Application::CreateSecondaryDepthBuffer()
+{
+    mSecondaryDepthBuffer.Reset();
+
+    D3D12_RESOURCE_DESC desc = {};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = mSecondaryWidth;
+    desc.Height = mSecondaryHeight;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = mDepthStencilFormat;
+    desc.SampleDesc.Count = 1;
+    desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+    D3D12_CLEAR_VALUE clear = {};
+    clear.Format = mDepthStencilFormat;
+    clear.DepthStencil.Depth = 1.0f;
+    clear.DepthStencil.Stencil = 0;
+
+    CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+    ThrowIfFailed(md3dDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
+        D3D12_RESOURCE_STATE_DEPTH_WRITE, &clear, IID_PPV_ARGS(mSecondaryDepthBuffer.GetAddressOf())));
+    md3dDevice->CreateDepthStencilView(mSecondaryDepthBuffer.Get(), nullptr,
+        mSecondaryDsvHeap->GetCPUDescriptorHandleForHeapStart());
+}
+
+void Application::ResizeSecondaryWindow(UINT width, UINT height)
+{
+    if (!mSecondarySwapChain || width == 0 || height == 0) return; // свёрнуто
+    if (width == mSecondaryWidth && height == mSecondaryHeight) return;
+
+    FlushCommandQueue();
+    for (auto& buffer : mSecondarySwapChainBuffer)
+        buffer.Reset();
+    ThrowIfFailed(mSecondarySwapChain->ResizeBuffers(SwapChainBufferCount, width, height, mBackBufferFormat, SwapChainFlags()));
+
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(mSecondaryRtvHeap->GetCPUDescriptorHandleForHeapStart());
+    for (UINT i = 0; i < SwapChainBufferCount; i++)
+    {
+        ThrowIfFailed(mSecondarySwapChain->GetBuffer(i, IID_PPV_ARGS(&mSecondarySwapChainBuffer[i])));
+        md3dDevice->CreateRenderTargetView(mSecondarySwapChainBuffer[i].Get(), nullptr, rtvHandle);
+        rtvHandle.Offset(1, mRtvDescriptorSize);
+    }
+    mSecondaryWidth = width;
+    mSecondaryHeight = height;
+    CreateSecondaryDepthBuffer();
+}
+
+void Application::SetSecondaryWindowVisible(bool visible)
+{
+    if (!mhSecondaryWnd || mShowSecondaryWnd == visible) return;
+    mShowSecondaryWnd = visible;
+    // Без активации: фокус клавиатуры остаётся у главного окна
+    ShowWindow(mhSecondaryWnd, visible ? SW_SHOWNOACTIVATE : SW_HIDE);
+    Logger::Info(visible ? "Secondary Window: SHOWN" : "Secondary Window: HIDDEN");
+}
+
+LRESULT CALLBACK Application::SecondaryWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    if (msg == WM_NCCREATE) {
+        auto* create = reinterpret_cast<CREATESTRUCTW*>(lParam);
+        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(create->lpCreateParams));
+    }
+    auto* app = reinterpret_cast<Application*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    if (app) {
+        switch (msg) {
+        case WM_CLOSE:
+            // Крестик прячет окно; раньше WM_DESTROY второго окна завершал всё приложение
+            app->SetSecondaryWindowVisible(false);
+            return 0;
+        case WM_SIZE:
+            // Раньше этот WM_SIZE менял размер swap chain главного окна
+            if (wParam != SIZE_MINIMIZED)
+                app->ResizeSecondaryWindow(LOWORD(lParam), HIWORD(lParam));
+            return 0;
+        case WM_GETMINMAXINFO:
+            reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = { 200, 200 };
+            return 0;
+        case WM_KEYDOWN:
+            Input::Get().OnKeyDown(wParam, lParam);
+            return 0;
+        case WM_KEYUP:
+            Input::Get().OnKeyUp(wParam);
+            if (wParam == VK_ESCAPE) PostQuitMessage(0);
+            return 0;
+        default:
+            break;
+        }
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+LRESULT Application::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    Input& input = Input::Get();
+    switch (msg) {
+    case WM_KEYDOWN:
+        input.OnKeyDown(wParam, lParam);
+        return 0;
+    case WM_SYSKEYDOWN:
+        input.OnKeyDown(wParam, lParam);
+        break; // Alt+F4 и т.п. обрабатывает DefWindowProc
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        input.OnKeyUp(wParam);
+        // В D3DApp F2 включает 4xMSAA, но swap chain с FLIP_DISCARD MSAA не поддерживает - приложение падало
+        if (wParam == VK_F2) return 0;
+        break; // Esc (выход) обрабатывает D3DApp
+    case WM_MOUSEWHEEL:
+        // Раньше колесо мыши не обрабатывалось вовсе (m_scrollDelta всегда был 0)
+        input.OnMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+        return 0;
+    case WM_KILLFOCUS:
+        input.Reset();
+        break;
+    case WM_ACTIVATE:
+        // Переход фокуса во второе окно движка (и режим замера) не ставит игру на паузу
+        if (LOWORD(wParam) == WA_INACTIVE &&
+            (reinterpret_cast<HWND>(lParam) == mhSecondaryWnd || ConfigManager::Get().Config().benchmark))
+            return 0;
+        break;
+    default:
+        break;
+    }
+    return D3DApp::MsgProc(hwnd, msg, wParam, lParam);
 }
 
 void Application::OnResize()
@@ -371,21 +600,59 @@ void Application::OnResize()
     D3DApp::OnResize();
 }
 
+// ============================================================ кадр
+
+void Application::UpdateCamera(const GameTimer& gt)
+{
+    if (!m_cameraSystem || ConfigManager::Get().Config().benchmark) return; // на замере камера неподвижна
+    const Input& input = Input::Get();
+
+    // Раньше клавиши читались через GetAsyncKeyState - и когда окно не в фокусе
+    const bool moveForward = input.IsKeyDown(VK_UP);
+    const bool moveBackward = input.IsKeyDown(VK_DOWN);
+    const bool moveLeft = input.IsKeyDown(VK_LEFT);
+    const bool moveRight = input.IsKeyDown(VK_RIGHT);
+    const bool moveDown = input.IsKeyDown('Q');
+    const bool moveUp = input.IsKeyDown('E');
+
+    // ПКМ - вращение
+    float mouseDeltaX = 0.0f, mouseDeltaY = 0.0f;
+    if (input.IsMouseDown(MouseButton::Right)) {
+        mouseDeltaX = (float)input.MouseDeltaX();
+        mouseDeltaY = (float)input.MouseDeltaY();
+    }
+
+    // ЛКМ - приближение/отдаление (движение мыши вверх → приближение) + колесо
+    float scrollDelta = input.WheelDelta();
+    if (input.IsMouseDown(MouseButton::Left))
+        scrollDelta += -(float)input.MouseDeltaY() * 0.05f;
+
+    m_cameraSystem->Update(m_world, gt.DeltaTime(),
+        moveForward, moveBackward,
+        moveLeft, moveRight,
+        moveUp, moveDown,
+        mouseDeltaX, mouseDeltaY,
+        scrollDelta);
+}
+
 void Application::Update(const GameTimer& gt)
 {
+    ZoneScopedN("Application::Update");
+    const EngineConfig& config = ConfigManager::Get().Config();
+    Input& input = Input::Get();
+
+    mJobs.BeginFrame();
+    mJobs.PumpMainThread(kMainThreadJobsPerFrame);
+
     mFrameCount++;
     if (mFrameCount <= 500 && (mFrameCount % 100 == 0 || mFrameCount == 1))
     {
         Logger::Info("Frame " + to_string(mFrameCount) + " | DeltaTime: " + to_string(gt.DeltaTime()) + "s");
     }
 
-    //  ПЕРЕКЛЮЧЕНИЕ ВТОРОГО ОКНА (W) 
-    if (GetAsyncKeyState('W') & 0x8000) {
-        Sleep(200);
-        mShowSecondaryWnd = !mShowSecondaryWnd;
-        ShowWindow(mhSecondaryWnd, mShowSecondaryWnd ? SW_SHOW : SW_HIDE);
-        Logger::Info(mShowSecondaryWnd ? "Secondary Window: SHOWN" : "Secondary Window: HIDDEN");
-    }
+    //  ПЕРЕКЛЮЧЕНИЕ ВТОРОГО ОКНА (W)
+    if (input.WasKeyPressed('W'))
+        SetSecondaryWindowVisible(!mShowSecondaryWnd);
 
     mStateManager.Update(gt);
     mStateManager.ProcessKeyboardInput(gt);
@@ -404,116 +671,34 @@ void Application::Update(const GameTimer& gt)
         Logger::Info("Objects HIDDEN (auto)");
     }
 
-    // ПОЛУЧАЕМ ДЕЛЬТЫ МЫШИ
-    static int lastMouseX = 0;
-    static int lastMouseY = 0;
-    POINT mousePos;
-    GetCursorPos(&mousePos);
-    ScreenToClient(mhMainWnd, &mousePos);
-
-    int deltaX = mousePos.x - lastMouseX;
-    int deltaY = mousePos.y - lastMouseY;
-
-    // Для вращения камеры (ПКМ)
-    float mouseDeltaX = 0.0f;
-    float mouseDeltaY = 0.0f;
-    if (GetAsyncKeyState(VK_RBUTTON) & 0x8000) {
-        mouseDeltaX = static_cast<float>(deltaX);
-        mouseDeltaY = static_cast<float>(deltaY);
+    if (isPlayState) {
+        if (!config.benchmark) { // на замере сцена фиксирована
+            if (input.WasKeyPressed('B')) {
+                if (m_stress.entities.empty()) SpawnStressScene(config.stressEntities);
+                else DespawnStressScene();
+            }
+            if (input.WasKeyPressed('J')) {
+                const bool enabled = !mJobs.IsParallelEnabled();
+                mJobs.SetParallelEnabled(enabled);
+                Logger::Info(std::string("Job system parallel execution: ") + (enabled ? "ON" : "OFF"));
+            }
+        }
+        UpdateStressAnimation(gt);
     }
 
-    lastMouseX = mousePos.x;
-    lastMouseY = mousePos.y;
-
-    // ========== УПРАВЛЕНИЕ КАМЕРОЙ ==========
-    if (m_cameraSystem) {
-        // Получаем состояние клавиш
-        bool moveForward = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-        bool moveBackward = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-        bool moveLeft = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-        bool moveRight = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-        bool moveDown = (GetAsyncKeyState('Q') & 0x8000) != 0;
-        bool moveUp = (GetAsyncKeyState('E') & 0x8000) != 0;
-
-        // Получаем позицию мыши
-        POINT currentMousePos;
-        GetCursorPos(&currentMousePos);
-        ScreenToClient(mhMainWnd, &currentMousePos);
-
-        float mouseDeltaX = 0.0f;
-        float mouseDeltaY = 0.0f;
-
-        // ПКМ - вращение
-        bool isRMBPressed = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-        if (isRMBPressed) {
-            if (!m_isRMBDragging) {
-                m_isRMBDragging = true;
-                m_lastMousePos = currentMousePos;
-            }
-            else {
-                mouseDeltaX = static_cast<float>(currentMousePos.x - m_lastMousePos.x);
-                mouseDeltaY = static_cast<float>(currentMousePos.y - m_lastMousePos.y);
-                m_lastMousePos = currentMousePos;
-            }
-        }
-        else {
-            m_isRMBDragging = false;
-        }
-
-        // ЛКМ - приближение/отдаление
-        bool isLMBPressed = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-        float scrollDelta = 0.0f;
-        if (isLMBPressed) {
-            if (!m_isLMBDragging) {
-                m_isLMBDragging = true;
-                m_lastMousePos = currentMousePos;
-            }
-            else {
-                // Движение мыши вверх → приближение
-                scrollDelta = static_cast<float>(m_lastMousePos.y - currentMousePos.y) * 0.05f;
-                m_lastMousePos = currentMousePos;
-            }
-        }
-        else {
-            m_isLMBDragging = false;
-        }
-
-        // Добавляем колесико мыши
-        if (m_scrollDelta != 0.0f) {
-            scrollDelta += m_scrollDelta;
-            m_scrollDelta = 0.0f;
-        }
-
-        // Обновляем камеру
-        m_cameraSystem->Update(m_world, gt.DeltaTime(),
-            moveForward, moveBackward,
-            moveLeft, moveRight,
-            moveUp, moveDown,
-            mouseDeltaX, mouseDeltaY,
-            scrollDelta);
-    }
-
+    UpdateCamera(gt);
 
     // ========== ГОРЯЧИЕ КЛАВИШИ ДЛЯ СЕРИАЛИЗАЦИИ ==========
-    static bool wasF5Pressed = false;
-    bool f5Pressed = (GetAsyncKeyState(VK_F5) & 0x8000);
-    if (f5Pressed && !wasF5Pressed) {
-        SaveScene("scene.json");
-    }
-    wasF5Pressed = f5Pressed;
+    if (input.WasKeyPressed(VK_F5)) SaveScene("scene.json");
+    if (input.WasKeyPressed(VK_F6)) LoadScene("scene.json");
 
-    static bool wasF6Pressed = false;
-    bool f6Pressed = (GetAsyncKeyState(VK_F6) & 0x8000);
-    if (f6Pressed && !wasF6Pressed) {
-        LoadScene("scene.json");
-    }
-    wasF6Pressed = f6Pressed;
-
+    UpdateCaption();
+    input.EndFrame();
 }
-
 
 void Application::Draw(const GameTimer& gt)
 {
+    ZoneScopedN("Application::Draw");
     if (!m_cameraSystem) {
         Logger::Error("CameraSystem is null!");
         return;
@@ -521,451 +706,162 @@ void Application::Draw(const GameTimer& gt)
 
     glm::mat4 view = m_cameraSystem->GetViewMatrix();
     glm::mat4 proj = m_cameraSystem->GetProjectionMatrix((float)mClientWidth / mClientHeight);
-    glm::vec3 cameraPos = m_cameraSystem->GetCameraPosition();
-   
-    //// Получаем камеру из World
-    //Camera* camera = m_world.GetCamera(m_cameraEntity);
-    //if (!camera) {
-    //    Logger::Error("No camera found!");
-    //    return;
-    //}
-
-    //glm::mat4 view = glm::lookAt(m_camera->position, m_camera->target, glm::vec3(0.0f, 1.0f, 0.0f));
-    //glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)mClientWidth / mClientHeight, 0.1f, 100.0f);
-    //glm::vec3 cameraPos = m_camera->position;
 
     mRenderAdapter->BeginFrame(0);
 
     if (m_showECS && m_renderSystem) {
-        auto currentState = mStateManager.GetCurrentState();
-        if (currentState && dynamic_cast<PlayState*>(currentState.get())) {
-
-            m_world.UpdateSpatialGrid();
-            std::vector<Entity> visibleEntities = m_world.GetVisibleEntities(cameraPos, 30.0f);
-
-            D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
-
-            static int dbgCounter = 0;
-            dbgCounter++;
-
-            for (Entity e : visibleEntities) {
-                Tag* tag = m_world.GetTag(e);
-                if (tag && tag->name == "MainWindow") {
-                    Transform* t = m_world.GetTransform(e);
-                    MeshRenderer* mr = m_world.GetMeshRenderer(e);
-                    if (t && mr) {
-
-                        glm::mat4 model = t->GetLocalMatrix();
-                        mRenderAdapter->SetModelMatrix(model);
-                        mRenderAdapter->SetColor(mr->color);
-                        mRenderAdapter->SetViewProjection(view, proj);
-
-                        // ========== УСТАНОВКА ТЕКСТУРЫ ==========
-                        if (mr->texture) {
-                            mRenderAdapter->SetTexture(mr->texture.get());
-                        }
-                        else {
-                            mRenderAdapter->SetTexture(nullptr);
-                        }
-
-                        if (mr->useLoadedMesh && mr->mesh) {
-                            // Если GPU-меш еще не загружен - загружаем
-                            if (mr->mesh->gpuMesh.IndexCount == 0 && d3d) {
-                                auto gpu = d3d->UploadMesh(*mr->mesh, md3dDevice.Get(), mCommandList.Get());
-                                if (gpu.IndexCount > 0) {
-                                    mr->mesh->gpuMesh = gpu;
-                                    Logger::Info("GPU Mesh uploaded for entity: " + std::to_string(e));
-                                }
-                            }
-
-                            // Рисуем загруженный меш
-                            if (mr->mesh->gpuMesh.IndexCount > 0) {
-                                mRenderAdapter->DrawMesh(mr->mesh->gpuMesh);
-                            }
-                            else {
-                                // Fallback на примитив, если меш не загрузился
-                                mRenderAdapter->DrawPrimitiveECS(mr->type);
-                            }
-                        }
-                        else {
-                            // Рисуем примитив (треугольник, квадрат и т.д.)
-                            mRenderAdapter->DrawPrimitiveECS(mr->type);
-                        }
-                    }
-                }
-            }
+        // Подготовка отрисовки - параллельно на job system, запись команд - здесь
+        m_renderSystem->Render(m_world, mJobs, view, proj, "MainWindow", &mBenchmark);
+        if (mFrameCount % 600 == 0) {
+            const RenderSystem::Stats& stats = m_renderSystem->LastStats();
+            Logger::Info("Render: " + std::to_string(stats.visible) + " visible of " +
+                         std::to_string(stats.candidates) + " objects (frustum culling)");
         }
     }
 
     mRenderAdapter->EndFrame(0);
 
     if (mShowSecondaryWnd) {
+        ZoneScopedN("SecondaryWindow");
+        // Своя камера (единичная): раньше квадрат рисовался с видом и проекцией главной камеры
+        mRenderAdapter->SetViewProjection(glm::mat4(1.0f), glm::mat4(1.0f));
         mRenderAdapter->BeginFrame(1);
-        mRenderAdapter->DrawPrimitive(PrimitiveType::Square, { 0.0f, 0.0f, 0.0f }, 0.0f, 1.5f);
+        mRenderAdapter->DrawPrimitive(PrimitiveType::Square, { 0.0f, 0.0f, 0.0f }, gt.TotalTime() * 0.5f, 1.5f);
         mRenderAdapter->EndFrame(1);
     }
 
-    mCurrBackBuffer = (mCurrBackBuffer + 1) % SwapChainBufferCount;
+    FrameMark;
+
+    // Полное время кадра (от конца прошлого до конца текущего) - для замеров
+    const auto now = std::chrono::steady_clock::now();
+    if (mHasLastFrameEnd) {
+        const double frameMs = std::chrono::duration<double, std::milli>(now - mLastFrameEnd).count();
+        TracyPlot("Frame time (ms)", frameMs);
+        if (mBenchmark.OnFrameEnd(frameMs)) {
+            Logger::Info("Benchmark finished, exiting");
+            PostQuitMessage(0);
+        }
+    }
+    mLastFrameEnd = now;
+    mHasLastFrameEnd = true;
 }
 
+void Application::UpdateCaption()
+{
+    std::wstring info = L"  [";
+    for (const char* c = StateName(mStateManager.GetCurrentState()); *c; ++c) info += (wchar_t)*c;
+    info += L"]  jobs: ";
+    info += mJobs.IsParallelEnabled() ? (L"ON, " + std::to_wstring(mJobs.ThreadCount()) + L" threads") : std::wstring(L"OFF");
+    info += L"  objects: " + std::to_wstring(m_renderSystem ? m_renderSystem->LastStats().visible : 0) +
+            L" visible / " + std::to_wstring(m_world.GetEntities().size());
+    if (info != mCaptionInfo) {
+        mCaptionInfo = info;
+        mMainWndCaption = L"Engine" + info; // D3DApp::CalculateFrameStats добавит FPS
+    }
+}
+
+// ============================================================ стресс-сцена
+
+void Application::SpawnStressScene(uint32_t count)
+{
+    if (!m_stress.entities.empty() || count == 0) return;
+    ZoneScopedN("SpawnStressScene");
+    D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
+
+    m_stress.mesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
+    if (m_stress.mesh && d3d) d3d->UploadMeshToGPU(*m_stress.mesh);
+    for (const char* path : { "assets/textures/wood.jpg", "assets/textures/heart.jpg", "assets/textures/texture_stepler.jpg" }) {
+        auto tex = ResourceManager::Get().LoadTextureData(path);
+        if (!tex) continue;
+        if (d3d && tex->srvIndex < 0) d3d->UploadTextureToGPU(*tex);
+        m_stress.textures.push_back(tex);
+    }
+
+    // Сетка кубов в плоскости XZ под основной сценой; фиксированный seed - одинаковая сцена в каждом замере
+    const uint32_t side = (uint32_t)std::ceil(std::sqrt((double)count));
+    const float spacing = 1.1f;
+    const float half = (side - 1) * spacing * 0.5f;
+    std::mt19937 rng(ConfigManager::Get().Config().sceneSeed);
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+
+    m_stress.entities.reserve(count);
+    m_stress.transforms.reserve(count);
+    for (uint32_t i = 0; i < count; ++i) {
+        Entity e = m_world.CreateEntity();
+        Transform& t = m_world.AddTransform(e);
+        const glm::vec3 base((i % side) * spacing - half, -2.5f, (i / side) * spacing - half);
+        t.position = base;
+        t.scale = glm::vec3(0.35f);
+
+        MeshRenderer& mr = m_world.AddMeshRenderer(e);
+        mr.mesh = m_stress.mesh;
+        mr.texture = m_stress.textures.empty() ? nullptr : m_stress.textures[i % m_stress.textures.size()];
+        mr.useLoadedMesh = m_stress.mesh != nullptr;
+        m_world.AddTag(e, "MainWindow");
+
+        m_stress.entities.push_back(e);
+        m_stress.transforms.push_back(&t);
+        m_stress.basePositions.push_back(base);
+        m_stress.axes.push_back(glm::normalize(glm::vec3(unit(rng) - 0.5f, unit(rng) + 0.2f, unit(rng) - 0.5f)));
+        m_stress.speeds.push_back(0.5f + 2.0f * unit(rng));
+        m_stress.phases.push_back(unit(rng) * 6.2831853f);
+    }
+    Logger::Info("Stress scene spawned: " + std::to_string(count) + " cubes");
+}
+
+void Application::DespawnStressScene()
+{
+    if (m_stress.entities.empty()) return;
+    ZoneScopedN("DespawnStressScene");
+    m_world.DestroyEntities(m_stress.entities);
+    Logger::Info("Stress scene removed: " + std::to_string(m_stress.entities.size()) + " cubes");
+    m_stress = StressScene{};
+}
+
+void Application::UpdateStressAnimation(const GameTimer& gt)
+{
+    const uint32_t count = (uint32_t)m_stress.transforms.size();
+    if (count == 0) return;
+
+    const auto start = std::chrono::steady_clock::now();
+    const float time = gt.TotalTime();
+    {
+        ZoneScopedN("StressAnimation");
+        // Каждый куб пишет только свой Transform - диапазоны независимы
+        mJobs.ParallelFor(count, 256, [&](uint32_t begin, uint32_t end) {
+            for (uint32_t i = begin; i < end; ++i) {
+                const float angle = time * m_stress.speeds[i] + m_stress.phases[i];
+                Transform* t = m_stress.transforms[i];
+                t->rotation = glm::angleAxis(angle, m_stress.axes[i]);
+                t->position = m_stress.basePositions[i] + glm::vec3(0.0f, 0.3f * std::sin(angle * 1.3f), 0.0f);
+            }
+        }, "StressAnimation");
+    }
+    mBenchmark.RecordZone("StressAnimation",
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+}
+
+// ============================================================ мышь
 
 void Application::OnMouseDown(WPARAM btnState, int x, int y)
 {
-    m_lastMouseX = x;
-    m_lastMouseY = y;
+    Input::Get().OnMouseButtons(btnState);
+    Input::Get().OnMouseMove(x, y);
+    SetCapture(mhMainWnd); // перетаскивание продолжается и за пределами окна
     mStateManager.OnMouseDown(btnState, x, y);
 }
 
 void Application::OnMouseUp(WPARAM btnState, int x, int y)
 {
+    Input::Get().OnMouseButtons(btnState);
+    Input::Get().OnMouseMove(x, y);
+    if ((btnState & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON)) == 0)
+        ReleaseCapture();
     mStateManager.OnMouseUp(btnState, x, y);
 }
 
 void Application::OnMouseMove(WPARAM btnState, int x, int y)
 {
-    int deltaX = x - m_lastMouseX;
-    int deltaY = y - m_lastMouseY;
-
-    // Для вращения камеры (ПКМ)
-    if (btnState & MK_RBUTTON) {
-        m_mouseDeltaX = static_cast<float>(deltaX);
-        m_mouseDeltaY = static_cast<float>(deltaY);
-    }
-
-    m_lastMouseX = x;
-    m_lastMouseY = y;
-
-    // НЕ вызываем mStateManager.OnMouseMove, чтобы не конфликтовать
-    // mStateManager.OnMouseMove(btnState, x, y);
-}
-
-bool D3D12RenderAdapter::Initialize()
-{
-    Logger::Info("Initializing D3D12RenderAdapter...");
-
-    ThrowIfFailed(mApp->mCommandList->Reset(mApp->mDirectCmdListAlloc.Get(), nullptr));
-
-    BuildRootSignature();
-    BuildShadersAndInputLayout();
-    BuildGeometry();
-    BuildPSO();
-
-
-    // Создаём дескрипторный хип для текстур
-    D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-    srvHeapDesc.NumDescriptors = 64;
-    srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-    ThrowIfFailed(mApp->md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mTextureSrvHeap)));
-    mTextureSrvDescriptorSize = mApp->md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-    // Закрываем command list (команды BuildGeometry + копирование текстуры)
-    ThrowIfFailed(mApp->mCommandList->Close());
-    ID3D12CommandList* cmdLists[] = { mApp->mCommandList.Get() };
-    mApp->mCommandQueue->ExecuteCommandLists(_countof(cmdLists), cmdLists);
-    mApp->FlushCommandQueue();
-
-    // Сбрасываем command list для следующего кадра (он будет открыт)
-    ThrowIfFailed(mApp->mCommandList->Reset(mApp->mDirectCmdListAlloc.Get(), nullptr));
-    // И сразу закрываем, чтобы первый кадр мог сбросить allocator без ошибки
-    ThrowIfFailed(mApp->mCommandList->Close());
-
-    Logger::Info("D3D12RenderAdapter initialized successfully");
-    return true;
-}
-
-void D3D12RenderAdapter::BeginFrame(int windowIndex) {
-    auto cmdListAlloc = mApp->mDirectCmdListAlloc;
-    auto cmdList = mApp->mCommandList;
-
-    if (windowIndex == 0) {
-        ThrowIfFailed(cmdListAlloc->Reset());
-    }
-    ThrowIfFailed(cmdList->Reset(cmdListAlloc.Get(), mPSO.Get()));
-
-    UINT backBufferIndex = 0;
-    ComPtr<IDXGISwapChain3> sc3;
-    if (windowIndex == 0) {
-        if (SUCCEEDED(mApp->mSwapChain.As(&sc3))) {
-            backBufferIndex = sc3->GetCurrentBackBufferIndex();
-        }
-    }
-    else {
-        if (SUCCEEDED(mApp->mSecondarySwapChain.As(&sc3))) {
-            backBufferIndex = sc3->GetCurrentBackBufferIndex();
-        }
-    }
-
-    ID3D12Resource* currentBuffer = (windowIndex == 0) ? mApp->mSwapChainBuffer[backBufferIndex].Get() : mApp->mSecondarySwapChainBuffer[backBufferIndex].Get();
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = (windowIndex == 0) ?
-        CD3DX12_CPU_DESCRIPTOR_HANDLE(mApp->mRtvHeap->GetCPUDescriptorHandleForHeapStart(), backBufferIndex, mApp->mRtvDescriptorSize) :
-        CD3DX12_CPU_DESCRIPTOR_HANDLE(mApp->mSecondaryRtvHeap->GetCPUDescriptorHandleForHeapStart(), backBufferIndex, mApp->mRtvDescriptorSize);
-
-    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(currentBuffer,
-        D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    cmdList->ResourceBarrier(1, &barrier);
-
-    cmdList->RSSetViewports(1, &mApp->mScreenViewport);
-    cmdList->RSSetScissorRects(1, &mApp->mScissorRect);
-
-    const float* clearColor = ConfigManager::Get().GetBackgroundColor();
-    D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = mApp->DepthStencilView();
-    cmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-    cmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-    cmdList->OMSetRenderTargets(1, &rtvHandle, true, &dsvHandle);
-}
-
-void D3D12RenderAdapter::EndFrame(int windowIndex) {
-    auto cmdList = mApp->mCommandList;
-
-    UINT backBufferIndex = 0;
-    ComPtr<IDXGISwapChain3> sc3;
-    if (windowIndex == 0) {
-        if (SUCCEEDED(mApp->mSwapChain.As(&sc3))) {
-            backBufferIndex = sc3->GetCurrentBackBufferIndex();
-        }
-    }
-    else {
-        if (SUCCEEDED(mApp->mSecondarySwapChain.As(&sc3))) {
-            backBufferIndex = sc3->GetCurrentBackBufferIndex();
-        }
-    }
-
-    ID3D12Resource* currentBuffer = (windowIndex == 0) ? mApp->mSwapChainBuffer[backBufferIndex].Get() : mApp->mSecondarySwapChainBuffer[backBufferIndex].Get();
-
-    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(currentBuffer,
-        D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    cmdList->ResourceBarrier(1, &barrier);
-
-    ThrowIfFailed(cmdList->Close());
-
-    ID3D12CommandList* cmdsLists[] = { cmdList.Get() };
-    mApp->mCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
-
-    if (windowIndex == 0) {
-        ThrowIfFailed(mApp->mSwapChain->Present(0, 0));
-    }
-    else {
-        ThrowIfFailed(mApp->mSecondarySwapChain->Present(0, 0));
-    }
-
-    mApp->FlushCommandQueue();
-}
-
-void D3D12RenderAdapter::DrawPrimitive(PrimitiveType type, DirectX::XMFLOAT3 position, float rotation, float scale) {
-    auto cmdList = mApp->mCommandList;
-
-    // Вспомогательная лямбда для конвертации glm::mat4 в XMMATRIX
-    auto ToXMMATRIX = [](const glm::mat4& m) -> DirectX::XMMATRIX {
-        return DirectX::XMMatrixSet(
-            m[0][0], m[0][1], m[0][2], m[0][3],
-            m[1][0], m[1][1], m[1][2], m[1][3],
-            m[2][0], m[2][1], m[2][2], m[2][3],
-            m[3][0], m[3][1], m[3][2], m[3][3]
-        );
-        };
-
-    DirectX::XMMATRIX s = DirectX::XMMatrixScaling(scale, scale, scale);
-    DirectX::XMMATRIX r = DirectX::XMMatrixRotationZ(rotation);
-    DirectX::XMMATRIX t = DirectX::XMMatrixTranslation(position.x, position.y, position.z);
-    DirectX::XMMATRIX world = s * r * t;
-
-    DirectX::XMMATRIX view = ToXMMATRIX(m_viewMatrix);
-    DirectX::XMMATRIX proj = ToXMMATRIX(m_projectionMatrix);
-
-    struct CB {
-        DirectX::XMMATRIX world;
-        DirectX::XMMATRIX view;
-        DirectX::XMMATRIX proj;
-    } cb;
-
-    cb.world = DirectX::XMMatrixTranspose(world);
-    cb.view = DirectX::XMMatrixTranspose(view);
-    cb.proj = DirectX::XMMatrixTranspose(proj);
-
-    cmdList->SetGraphicsRootSignature(mRootSignature.Get());
-    cmdList->SetGraphicsRoot32BitConstants(0, 48, &cb, 0);
-
-    cmdList->IASetVertexBuffers(0, 1, &mVBV);
-    cmdList->IASetIndexBuffer(&mIBV);
-    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    if (type == PrimitiveType::Triangle) {
-        cmdList->DrawIndexedInstanced(3, 1, 0, 0, 0);
-    }
-    else if (type == PrimitiveType::Square || type == PrimitiveType::Quad) {
-        cmdList->DrawIndexedInstanced(6, 1, 3, 0, 0);
-    }
-    else if (type == PrimitiveType::Cube) {
-        cmdList->DrawIndexedInstanced(36, 1, 0, 0, 0);
-    }
-}
-
-
-void D3D12RenderAdapter::SetModelMatrix(const glm::mat4& matrix) {
-    m_modelMatrix = matrix;
-}
-
-void D3D12RenderAdapter::SetColor(const glm::vec4& color) {
-    m_color = color;
-}
-
-void D3D12RenderAdapter::SetViewProjection(const glm::mat4& view, const glm::mat4& proj) {
-    m_viewMatrix = view;
-    m_projectionMatrix = proj;
-}
-
-void D3D12RenderAdapter::DrawPrimitiveECS(PrimitiveType type) {
-    // Позиция
-    DirectX::XMFLOAT3 position(
-        m_modelMatrix[3][0],
-        m_modelMatrix[3][1],
-        m_modelMatrix[3][2]
-    );
-
-    // Поворот (угол вокруг Z) из матрицы модели
-    // Верхняя левая часть матрицы 2x2: [cos, -sin; sin, cos]
-    float rotation = atan2(m_modelMatrix[1][0], m_modelMatrix[0][0]);
-
-    // Масштаб
-    float scale = sqrt(m_modelMatrix[0][0] * m_modelMatrix[0][0] + m_modelMatrix[1][0] * m_modelMatrix[1][0]);
-    if (scale == 0) scale = 1.0f;
-
-    // Устанавливаем текстуру (пока без текстуры, просто заглушка)
-    //SetTexture(nullptr);  // или какую-то конкретную текстуру
-
-    DrawPrimitive(type, position, rotation, scale);
-}
-
-void D3D12RenderAdapter::BuildRootSignature()
-{
-    CD3DX12_ROOT_PARAMETER slotRootParameter[2];
-
-    // 0 — константы (World, View, Proj)
-    slotRootParameter[0].InitAsConstants(48, 0);
-
-    // 1 — таблица дескрипторов для текстуры (t0)
-    CD3DX12_DESCRIPTOR_RANGE texTable;
-    texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-    slotRootParameter[1].InitAsDescriptorTable(1, &texTable, D3D12_SHADER_VISIBILITY_PIXEL);
-
-    // Статический сэмплер (s0)
-    CD3DX12_STATIC_SAMPLER_DESC samplerDesc(0,
-        D3D12_FILTER_MIN_MAG_MIP_LINEAR,
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-        D3D12_TEXTURE_ADDRESS_MODE_WRAP);
-
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
-        1, &samplerDesc,
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-
-    ComPtr<ID3DBlob> serializedRootSig;
-    ComPtr<ID3DBlob> errorBlob;
-    HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-        serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
-
-    if (FAILED(hr)) {
-        if (errorBlob) Logger::Error("Root Signature serialize error: " + std::string((char*)errorBlob->GetBufferPointer()));
-    }
-
-    ThrowIfFailed(mApp->md3dDevice->CreateRootSignature(0,
-        serializedRootSig->GetBufferPointer(),
-        serializedRootSig->GetBufferSize(),
-        IID_PPV_ARGS(&mRootSignature)));
-}
-
-void D3D12RenderAdapter::BuildShadersAndInputLayout()
-{
-    Logger::Info("Loading shaders from files...");
-
-    mShaderProgram = CreateShaderProgram(
-        "Shaders/VertexShader.hlsl",
-        "Shaders/PixelShader.hlsl"
-    );
-
-    if (!mShaderProgram || !mShaderProgram->IsValid())
-    {
-        Logger::Error("Failed to load shaders from files!");
-        return;
-    }
-
-    mvsByteCode = mShaderProgram->vsBlob;
-    mpsByteCode = mShaderProgram->psBlob;
-
-    mInputLayout =
-    {
-        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-    };
-
-    Logger::Info("Shaders successfully loaded from files.");
-}
-
-void D3D12RenderAdapter::BuildGeometry() {
-    struct Vertex {
-        XMFLOAT3 Pos;
-        XMFLOAT4 Color;
-        XMFLOAT2 TexCoord;
-    };
-
-    Vertex vertices[] =
-    {
-        // ТРЕУГОЛЬНИК (0, 1, 2)
-        { XMFLOAT3(0.0f,  0.5f, 0.5f), XMFLOAT4(Colors::Red),    XMFLOAT2(0.5f, 0.0f) },
-        { XMFLOAT3(0.5f, -0.5f, 0.5f), XMFLOAT4(Colors::Green),  XMFLOAT2(1.0f, 1.0f) },
-        { XMFLOAT3(-0.5f, -0.5f, 0.5f), XMFLOAT4(Colors::Blue),   XMFLOAT2(0.0f, 1.0f) },
-
-        // КВАДРАТ (3, 4, 5, 6)
-        { XMFLOAT3(-0.5f,  0.5f, 0.5f), XMFLOAT4(Colors::Cyan),    XMFLOAT2(0.0f, 0.0f) },
-        { XMFLOAT3(0.5f,  0.5f, 0.5f), XMFLOAT4(Colors::Magenta), XMFLOAT2(1.0f, 0.0f) },
-        { XMFLOAT3(0.5f, -0.5f, 0.5f), XMFLOAT4(Colors::Yellow),  XMFLOAT2(1.0f, 1.0f) },
-        { XMFLOAT3(-0.5f, -0.5f, 0.5f), XMFLOAT4(Colors::White),   XMFLOAT2(0.0f, 1.0f) }
-    };
-
-    std::uint16_t indices[] = {
-        0, 1, 2,               // Треугольник
-        3, 4, 5, 3, 5, 6       // Квадрат (два треугольника)
-    };
-
-    const UINT vbByteSize = sizeof(vertices);
-    const UINT ibByteSize = sizeof(indices);
-
-    mVertexBuffer = d3dUtil::CreateDefaultBuffer(mApp->md3dDevice.Get(), mApp->mCommandList.Get(),
-        vertices, vbByteSize, mVertexBufferUploader);
-    mIndexBuffer = d3dUtil::CreateDefaultBuffer(mApp->md3dDevice.Get(), mApp->mCommandList.Get(),
-        indices, ibByteSize, mIndexBufferUploader);
-
-    mVBV.BufferLocation = mVertexBuffer->GetGPUVirtualAddress();
-    mVBV.StrideInBytes = sizeof(Vertex);  // теперь 32 байта (12+16+8)
-    mVBV.SizeInBytes = vbByteSize;
-
-    mIBV.BufferLocation = mIndexBuffer->GetGPUVirtualAddress();
-    mIBV.Format = DXGI_FORMAT_R16_UINT;
-    mIBV.SizeInBytes = ibByteSize;
-}
-
-void D3D12RenderAdapter::BuildPSO() {
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
-    ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-    psoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
-    psoDesc.pRootSignature = mRootSignature.Get();
-    psoDesc.VS = { reinterpret_cast<BYTE*>(mvsByteCode->GetBufferPointer()), mvsByteCode->GetBufferSize() };
-    psoDesc.PS = { reinterpret_cast<BYTE*>(mpsByteCode->GetBufferPointer()), mpsByteCode->GetBufferSize() };
-    //psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-    CD3DX12_RASTERIZER_DESC rasterDesc(D3D12_DEFAULT);
-    rasterDesc.CullMode = D3D12_CULL_MODE_NONE;  // Было D3D12_CULL_MODE_BACK
-    psoDesc.RasterizerState = rasterDesc;
-    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-    psoDesc.SampleMask = UINT_MAX;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = mApp->mBackBufferFormat;
-    psoDesc.SampleDesc.Count = mApp->m4xMsaaState ? 4 : 1;
-    psoDesc.SampleDesc.Quality = mApp->m4xMsaaState ? (mApp->m4xMsaaQuality - 1) : 0;
-    psoDesc.DSVFormat = mApp->mDepthStencilFormat;
-
-    ThrowIfFailed(mApp->md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO)));
+    Input::Get().OnMouseButtons(btnState);
+    Input::Get().OnMouseMove(x, y);
 }

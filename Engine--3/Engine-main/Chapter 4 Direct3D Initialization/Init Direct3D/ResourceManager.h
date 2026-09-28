@@ -15,7 +15,7 @@ public:
         return instance;
     }
 
-    // Простая версия для MeshData (без полного шаблона пока)
+    // РџСЂРѕСЃС‚Р°СЏ РІРµСЂСЃРёСЏ РґР»СЏ MeshData (Р±РµР· РїРѕР»РЅРѕРіРѕ С€Р°Р±Р»РѕРЅР° РїРѕРєР°)
     std::shared_ptr<MeshData> LoadMesh(const std::string& path) {
         auto it = m_meshes.find(path);
         if (it != m_meshes.end()) {
@@ -53,6 +53,7 @@ public:
     void Clear() {
         m_textures.clear();
         m_meshes.clear();
+        m_texturesData.clear(); // СЂР°РЅСЊС€Рµ С‚РµРєСЃС‚СѓСЂС‹ РѕСЃС‚Р°РІР°Р»РёСЃСЊ РІ РєСЌС€Рµ РїРѕСЃР»Рµ Clear()
     }
 
 private:

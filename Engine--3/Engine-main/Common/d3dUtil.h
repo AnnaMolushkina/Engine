@@ -229,9 +229,9 @@ struct MaterialConstants
 	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
 	DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
 	float Roughness = 0.2f;
-    float DisplacementStrength = 0.2; // Add displacement strength
+    float DisplacementStrength = 0.2f; // Add displacement strength
 	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
-    UINT DiffuseMapIndex = 0; // ������ ��������
+    UINT DiffuseMapIndex = 0; // ������ ��������
 };
 
 // Simple struct to represent a material for our demos.  A production 3D engine
@@ -279,12 +279,18 @@ struct Texture
 	Microsoft::WRL::ComPtr<ID3D12Resource> UploadHeap = nullptr;
 };
 
+// L#x (склейка L с результатом #) понимает только MSVC; двухшаговый макрос - стандартный вариант
+#define D3D_WIDEN_IMPL(s) L##s
+#define D3D_WIDEN(s) D3D_WIDEN_IMPL(s)
+
 #ifndef ThrowIfFailed
-#define ThrowIfFailed(x)                                              \
-{                                                                     \
-    HRESULT hr__ = (x);                                               \
-    std::wstring wfn = AnsiToWString(__FILE__);                       \
-    if(FAILED(hr__)) { throw DxException(hr__, L#x, wfn, __LINE__); } \
+#define ThrowIfFailed(x)                                                     \
+{                                                                            \
+    HRESULT hr__ = (x);                                                      \
+    if(FAILED(hr__))                                                         \
+    {                                                                        \
+        throw DxException(hr__, D3D_WIDEN(#x), AnsiToWString(__FILE__), __LINE__); \
+    }                                                                        \
 }
 #endif
 

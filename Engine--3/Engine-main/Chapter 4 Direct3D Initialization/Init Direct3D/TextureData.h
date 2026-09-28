@@ -18,7 +18,7 @@ struct TextureData : public Resource {
 
     std::string filePath;
 
-    // GPU-хендл текстуры
+    // GPU-С…РµРЅРґР» С‚РµРєСЃС‚СѓСЂС‹
     ComPtr<ID3D12Resource> textureResource = nullptr;
 
     bool IsValid() const { return width > 0 && height > 0 && !pixels.empty(); }

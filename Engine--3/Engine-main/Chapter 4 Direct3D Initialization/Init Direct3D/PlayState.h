@@ -5,6 +5,7 @@
 #include "Logger.h"
 #include "RenderAdapter.h"
 #include "PauseState.h"
+#include "Input.h"
 #include <memory>
 #include <algorithm>
 
@@ -21,9 +22,8 @@ public:
     }
 
     virtual void Update(const GameTimer& gt, GameStateManager* stateManager) override {
-        // Проверка на паузу
-        if (GetAsyncKeyState('P') & 0x8000) {
-            Sleep(200); // Спасает от многократного срабатывания клавиши за один кадр
+        // Проверка на паузу (WasKeyPressed срабатывает один раз на нажатие - Sleep(200) больше не нужен)
+        if (Input::Get().WasKeyPressed('P')) {
             stateManager->PushState(std::make_shared<PauseState>());
         }
     }
@@ -65,10 +65,11 @@ public:
     virtual void ProcessKeyboardInput(const GameTimer& gt) override {
         // Обработка перемещения (Стрелки)
         float speed = 1.5f; // Единиц в секунду
-        if (GetAsyncKeyState(VK_LEFT) & 0x8000)  mPosition.x -= speed * gt.DeltaTime();
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) mPosition.x += speed * gt.DeltaTime();
-        if (GetAsyncKeyState(VK_UP) & 0x8000)    mPosition.y += speed * gt.DeltaTime();
-        if (GetAsyncKeyState(VK_DOWN) & 0x8000)  mPosition.y -= speed * gt.DeltaTime();
+        const Input& input = Input::Get();
+        if (input.IsKeyDown(VK_LEFT))  mPosition.x -= speed * gt.DeltaTime();
+        if (input.IsKeyDown(VK_RIGHT)) mPosition.x += speed * gt.DeltaTime();
+        if (input.IsKeyDown(VK_UP))    mPosition.y += speed * gt.DeltaTime();
+        if (input.IsKeyDown(VK_DOWN))  mPosition.y -= speed * gt.DeltaTime();
     }
 
 private:
@@ -80,8 +81,7 @@ private:
 
 // Реализация метода Update для MainMenuState, так как он использует PlayState
 inline void MainMenuState::Update(const GameTimer& gt, GameStateManager* stateManager) {
-    if (GetAsyncKeyState(VK_RETURN) & 0x8000) {
-        Sleep(200); // От залипания
+    if (Input::Get().WasKeyPressed(VK_RETURN)) {
         stateManager->ChangeState(std::make_shared<PlayState>());
     }
 }

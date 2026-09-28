@@ -1,5 +1,5 @@
-Texture2D gTexture : register(t0); // текстура из регистра t0
-SamplerState gSampler : register(s0); // сэмплер для текстуры
+Texture2D gTexture : register(t0); // С‚РµРєСЃС‚СѓСЂР° РёР· СЂРµРіРёСЃС‚СЂР° t0
+SamplerState gSampler : register(s0); // СЃСЌРјРїР»РµСЂ РґР»СЏ С‚РµРєСЃС‚СѓСЂС‹
 
 struct VertexOut
 {
@@ -10,12 +10,14 @@ struct VertexOut
 
 float4 main(VertexOut pin) : SV_Target
 {
-    // Сэмплируем текстуру по UV-координатам
+    // РЎСЌРјРїР»РёСЂСѓРµРј С‚РµРєСЃС‚СѓСЂСѓ РїРѕ UV-РєРѕРѕСЂРґРёРЅР°С‚Р°Рј
     float4 texColor = gTexture.Sample(gSampler, pin.TexCoord);
     //float2 flippedUV = float2(pin.TexCoord.x, 1.0f - pin.TexCoord.y);
     //float4 texColor = gTexture.Sample(gSampler, flippedUV);
-    // Если хочешь только цвет, верни Color
-    // Если хочешь цвет * текстура, верни pin.Color * texColor
+    // Р•СЃР»Рё С…РѕС‡РµС€СЊ С‚РѕР»СЊРєРѕ С†РІРµС‚, РІРµСЂРЅРё Color
+    // Р•СЃР»Рё С…РѕС‡РµС€СЊ С†РІРµС‚ * С‚РµРєСЃС‚СѓСЂР°, РІРµСЂРЅРё pin.Color * texColor
     
-    return texColor; // ИСПОЛЬЗУЕМ ТЕКСТУРУ
+    // РўРµРєСЃС‚СѓСЂР° * С†РІРµС‚ РІРµСЂС€РёРЅС‹: Сѓ РјРµС€РµР№ РІРµСЂС€РёРЅС‹ Р±РµР»С‹Рµ (РІРёРґРЅР° С‡РёСЃС‚Р°СЏ С‚РµРєСЃС‚СѓСЂР°), Сѓ РїСЂРёРјРёС‚РёРІРѕРІ
+    // С‚РµРєСЃС‚СѓСЂР° Р±РµР»Р°СЏ (РІРёРґРЅС‹ С†РІРµС‚Р° РІРµСЂС€РёРЅ). Р Р°РЅСЊС€Рµ РїСЂРёРјРёС‚РёРІС‹ Р±СЂР°Р»Рё С†РІРµС‚ РёР· РЅРµРїСЂРёРІСЏР·Р°РЅРЅРѕР№ С‚РµРєСЃС‚СѓСЂС‹.
+    return texColor * pin.Color;
 }

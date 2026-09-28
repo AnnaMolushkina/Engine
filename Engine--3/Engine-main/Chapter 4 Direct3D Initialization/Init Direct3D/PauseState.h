@@ -4,6 +4,7 @@
 #include "GameStateManager.h"
 #include "Logger.h"
 #include "MainMenuState.h"
+#include "Input.h"
 #include <memory>
 
 class PauseState : public GameState {
@@ -20,15 +21,13 @@ public:
 
     virtual void Update(const GameTimer& gt, GameStateManager* stateManager) override {
         // Проверка нажатия P для возврата к игре
-        if (GetAsyncKeyState('P') & 0x8000) {
-            Sleep(200); //от залипания
+        if (Input::Get().WasKeyPressed('P')) {
             stateManager->PopState();
             return;
         }
 
         // Возврат в главное меню
-        if (GetAsyncKeyState(VK_BACK) & 0x8000) {
-            Sleep(200);
+        if (Input::Get().WasKeyPressed(VK_BACK)) {
             stateManager->ClearStates();
             stateManager->PushState(std::make_shared<MainMenuState>());
         }
