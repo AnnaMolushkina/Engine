@@ -1,6 +1,9 @@
 #include "MeshData.h"
 #include "Logger.h"
 
+#include <algorithm>
+#include <cmath>
+
 // Полные заголовки Assimp
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -80,6 +83,11 @@ std::shared_ptr<MeshData> MeshData::LoadFromFile(const std::string& path) {
             subMesh.indices.push_back(face.mIndices[j]);
         }
     }
+
+    float maxDistSq = 0.0f;
+    for (const Vertex3D& v : subMesh.vertices)
+        maxDistSq = std::max(maxDistSq, glm::dot(v.position, v.position));
+    mesh->boundingRadius = std::sqrt(maxDistSq);
 
     mesh->subMeshes.push_back(std::move(subMesh));
     mesh->loaded = true;

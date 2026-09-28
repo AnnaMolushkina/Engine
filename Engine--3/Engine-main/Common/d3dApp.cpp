@@ -4,6 +4,7 @@
 
 #include "d3dApp.h"
 #include <WindowsX.h>
+#include <dxgi1_5.h>
 
 using Microsoft::WRL::ComPtr;
 using namespace std;
@@ -45,6 +46,11 @@ HINSTANCE D3DApp::AppInst()const
 HWND D3DApp::MainWnd()const
 {
 	return mhMainWnd;
+}
+
+UINT D3DApp::SwapChainFlags()const
+{
+	return DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | (mTearingSupported ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
 }
 
 float D3DApp::AspectRatio()const
@@ -159,7 +165,7 @@ void D3DApp::OnResize()
 		SwapChainBufferCount, 
 		mClientWidth, mClientHeight, 
 		mBackBufferFormat, 
-		DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
+		SwapChainFlags()));
 
 	mCurrBackBuffer = 0;
  
@@ -196,8 +202,10 @@ void D3DApp::OnResize()
     optClear.Format = mDepthStencilFormat;
     optClear.DepthStencil.Depth = 1.0f;
     optClear.DepthStencil.Stencil = 0;
+    // Адрес временного объекта (&CD3DX12_...(...)) - расширение MSVC, поэтому заводим локальные переменные.
+    CD3DX12_HEAP_PROPERTIES defaultHeap(D3D12_HEAP_TYPE_DEFAULT);
     ThrowIfFailed(md3dDevice->CreateCommittedResource(
-        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        &defaultHeap,
 		D3D12_HEAP_FLAG_NONE,
         &depthStencilDesc,
 		D3D12_RESOURCE_STATE_COMMON,
@@ -213,8 +221,9 @@ void D3DApp::OnResize()
     md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), &dsvDesc, DepthStencilView());
 
     // Transition the resource from its initial state to be used as a depth buffer.
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+	auto depthBarrier = CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(),
+		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+	mCommandList->ResourceBarrier(1, &depthBarrier);
 	
     // Execute the resize commands.
     ThrowIfFailed(mCommandList->Close());
@@ -425,6 +434,15 @@ bool D3DApp::InitDirect3D()
 
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(&mdxgiFactory)));
 
+	// Поддерживает ли система tearing (нужен для честного замера FPS без vsync)
+	{
+		ComPtr<IDXGIFactory5> factory5;
+		BOOL allowTearing = FALSE;
+		if (SUCCEEDED(mdxgiFactory.As(&factory5)) &&
+			SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))))
+			mTearingSupported = allowTearing == TRUE;
+	}
+
 	// Try to create hardware device.
 	HRESULT hardwareResult = D3D12CreateDevice(
 		nullptr,             // default adapter
@@ -522,7 +540,7 @@ void D3DApp::CreateSwapChain()
     sd.OutputWindow = mhMainWnd;
     sd.Windowed = true;
 	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    sd.Flags = SwapChainFlags();
 
 	// Note: Swap chain uses queue to perform flush.
     ThrowIfFailed(mdxgiFactory->CreateSwapChain(
@@ -544,7 +562,7 @@ void D3DApp::FlushCommandQueue()
 	// Wait until the GPU has completed commands up to this fence point.
     if(mFence->GetCompletedValue() < mCurrentFence)
 	{
-		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+		HANDLE eventHandle = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
 
         // Fire event when GPU hits current fence.  
         ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFence, eventHandle));

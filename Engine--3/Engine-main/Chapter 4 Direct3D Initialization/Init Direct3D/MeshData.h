@@ -35,6 +35,9 @@ struct MeshData : public Resource {
     // GPU
     GPUMesh gpuMesh;
 
+    // Радиус описанной сферы в локальных координатах (для отбраковки по пирамиде видимости)
+    float boundingRadius = 1.0f;
+
     uint32_t GetTotalVertexCount() const;
     uint32_t GetTotalIndexCount() const;
     bool IsValid() const { return !subMeshes.empty(); }

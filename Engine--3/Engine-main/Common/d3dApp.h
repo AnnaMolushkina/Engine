@@ -84,11 +84,16 @@ protected:
 	bool      mResizing = false;   // are the resize bars being dragged?
     bool      mFullscreenState = false;// fullscreen enabled
 
-	// Set true to use 4X MSAA (�4.1.8).  The default is false.
+	// Set true to use 4X MSAA (§4.1.8).  The default is false.
     bool      m4xMsaaState = false;    // 4X MSAA enabled
     UINT      m4xMsaaQuality = 0;      // quality level of 4X MSAA
 
-	// Used to keep track of the �delta-time� and game time (�4.4).
+    // Tearing (DXGI 1.5). Без него flip-модель в окне ограничивает FPS частотой монитора
+    // даже при Present(0): замеры времени кадра упирались бы в 1/Гц.
+    bool      mTearingSupported = false;
+    UINT      SwapChainFlags() const;
+
+	// Used to keep track of the “delta-time” and game time (§4.4).
 	GameTimer mTimer;
 	
     Microsoft::WRL::ComPtr<IDXGIFactory4> mdxgiFactory;

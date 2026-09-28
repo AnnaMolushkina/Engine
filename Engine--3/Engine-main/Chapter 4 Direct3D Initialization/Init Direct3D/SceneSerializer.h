@@ -3,7 +3,7 @@
 #include "Transform.h"
 #include "MeshRenderer.h"
 #include "Tag.h"
-#include "json.hpp"
+#include <nlohmann/json.hpp>
 #include <string>
 #include <fstream>
 #include <vector>
@@ -13,7 +13,7 @@ using json = nlohmann::json;
 
 class SceneSerializer {
 public:
-    // Сохранить сцену в JSON файл (с состоянием анимаций)
+    // РЎРѕС…СЂР°РЅРёС‚СЊ СЃС†РµРЅСѓ РІ JSON С„Р°Р№Р» (СЃ СЃРѕСЃС‚РѕСЏРЅРёРµРј Р°РЅРёРјР°С†РёР№)
     static bool SaveScene(const World& world, const std::string& filename,
         float rotationAngle, float jumpPhase, float circleY) {
         json sceneJson;
@@ -57,7 +57,7 @@ public:
             sceneJson["entities"].push_back(entityJson);
         }
 
-        // Сохраняем состояние анимаций
+        // РЎРѕС…СЂР°РЅСЏРµРј СЃРѕСЃС‚РѕСЏРЅРёРµ Р°РЅРёРјР°С†РёР№
         sceneJson["animationState"]["rotationAngle"] = rotationAngle;
         sceneJson["animationState"]["jumpPhase"] = jumpPhase;
         sceneJson["animationState"]["circleY"] = circleY;
@@ -73,7 +73,7 @@ public:
         return true;
     }
 
-    // Загрузить сцену из JSON файла (с восстановлением состояния анимаций)
+    // Р—Р°РіСЂСѓР·РёС‚СЊ СЃС†РµРЅСѓ РёР· JSON С„Р°Р№Р»Р° (СЃ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµРј СЃРѕСЃС‚РѕСЏРЅРёСЏ Р°РЅРёРјР°С†РёР№)
     static bool LoadScene(World& world, const std::string& filename,
         Entity& outTriangle, Entity& outCircle, Entity& outSquare,
         float& outRotationAngle, float& outJumpPhase, float& outCircleY) {
@@ -88,7 +88,7 @@ public:
             return false;
         }
 
-        // Загружаем состояние анимаций
+        // Р—Р°РіСЂСѓР¶Р°РµРј СЃРѕСЃС‚РѕСЏРЅРёРµ Р°РЅРёРјР°С†РёР№
         if (sceneJson.contains("animationState")) {
             outRotationAngle = sceneJson["animationState"]["rotationAngle"].get<float>();
             outJumpPhase = sceneJson["animationState"]["jumpPhase"].get<float>();
@@ -100,7 +100,7 @@ public:
             outCircleY = 0.0f;
         }
 
-        // Очищаем старую сцену
+        // РћС‡РёС‰Р°РµРј СЃС‚Р°СЂСѓСЋ СЃС†РµРЅСѓ
         std::vector<Entity> oldEntities = world.GetRenderableEntities();
         for (Entity e : oldEntities) {
             world.DestroyEntity(e);
@@ -111,11 +111,11 @@ public:
         outCircle = 0;
         outSquare = 0;
 
-        // Загружаем сущности
+        // Р—Р°РіСЂСѓР¶Р°РµРј СЃСѓС‰РЅРѕСЃС‚Рё
         for (const auto& entityJson : sceneJson["entities"]) {
             Entity e = world.CreateEntity();
 
-            // Загружаем Transform
+            // Р—Р°РіСЂСѓР¶Р°РµРј Transform
             if (entityJson.contains("transform")) {
                 Transform& t = world.AddTransform(e);
 
@@ -133,7 +133,7 @@ public:
                 t.scale.z = entityJson["transform"]["scale"]["z"].get<float>();
             }
 
-            // Загружаем MeshRenderer
+            // Р—Р°РіСЂСѓР¶Р°РµРј MeshRenderer
             if (entityJson.contains("meshRenderer")) {
                 MeshRenderer& mr = world.AddMeshRenderer(e);
 
@@ -146,12 +146,12 @@ public:
                 mr.color.a = entityJson["meshRenderer"]["color"]["a"].get<float>();
             }
 
-            // Загружаем Tag
+            // Р—Р°РіСЂСѓР¶Р°РµРј Tag
             if (entityJson.contains("tag")) {
                 std::string name = entityJson["tag"]["name"].get<std::string>();
                 world.AddTag(e, name);
 
-                // Восстанавливаем ссылки по тегам
+                // Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃСЃС‹Р»РєРё РїРѕ С‚РµРіР°Рј
                 if (name == "MainWindow") {
                     MeshRenderer* mr = world.GetMeshRenderer(e);
                     if (mr && mr->type == PrimitiveType::Triangle) {

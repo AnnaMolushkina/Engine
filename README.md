@@ -1,17 +1,10 @@
+# Engine
 
+Учебный движок на DirectX 12 (ECS, Assimp, текстуры, job system на enkiTS, профилирование Tracy).
 
-## ВАЖНО!!! Чтобы проект начал работать вам нужно:
+Проект лежит в папке [`Engine--3/Engine-main`](Engine--3/Engine-main). Как открыть, собрать и запустить, описано в [`Engine--3/Engine-main/README.md`](Engine--3/Engine-main/README.md).
 
-1. Найти в проекте папку под названием `glm` по пути `Engine-main\glm`
+Коротко: Visual Studio 2022/2026 → «Файл → Открыть → Папка» → `Engine--3/Engine-main` → конфигурация x64 Debug/Release → Engine.exe → F5.
+Библиотеки (Assimp, glm, stb, nlohmann-json, enkiTS, Tracy) ставит vcpkg автоматически, ручная настройка путей больше не нужна.
 
-2. Скопировать полный путь к данной папке, пример: `C:\Users\Nika\Desktop\AID\Engine-main\glm`
-
-3. Открыть проект в Visual Studio
-
-4. Зайти в свойства проекта (`Alt + Enter`)
-
-5. Перейти в раздел **Дополнительные каталоги включаемых файлов** (`C++ → Общие`)
-
-6. Заменить в разделе **Дополнительные каталоги включаемых файлов** путь `C:\Users\Nika\Desktop\AID\Engine-main\glm` на тот путь, который вы ранее скопировали
-
-
+Что изменилось в ЛР1 (Job System) и какие есть кнопки: [`CHANGES.md`](Engine--3/Engine-main/CHANGES.md) / [`CHANGES.pdf`](Engine--3/Engine-main/CHANGES.pdf).

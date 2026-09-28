@@ -1,3 +1,22 @@
 {
-    "background_color": [0.39, 0.58, 0.93, 1.0]
+    "background_color": [0.39, 0.58, 0.93, 1.0],
+    "secondary_background_color": [0.12, 0.12, 0.16, 1.0],
+    "vsync": false,
+
+    "jobs": {
+        "enabled": true,
+        "worker_threads": 0
+    },
+
+    "scene": {
+        "stress_entities": 20000,
+        "stress_on_start": false,
+        "seed": 1337
+    },
+
+    "benchmark": {
+        "warmup_frames": 300,
+        "measure_frames": 2000,
+        "output": "bench_results.csv"
+    }
 }

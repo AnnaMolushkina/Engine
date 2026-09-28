@@ -10,9 +10,9 @@
 //    CameraSystem() {
 //        m_cameraPos = glm::vec3(0.0f, 2.0f, 8.0f);
 //        m_cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-//        m_cameraRadius = 8.0f;      // расстояние от центра
-//        m_cameraAngleX = 0.0f;      // угол вокруг Y (влево-вправо)
-//        m_cameraHeight = 2.0f;      // высота камеры
+//        m_cameraRadius = 8.0f;      // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РѕС‚ С†РµРЅС‚СЂР°
+//        m_cameraAngleX = 0.0f;      // СѓРіРѕР» РІРѕРєСЂСѓРі Y (РІР»РµРІРѕ-РІРїСЂР°РІРѕ)
+//        m_cameraHeight = 2.0f;      // РІС‹СЃРѕС‚Р° РєР°РјРµСЂС‹
 //    }
 //
 //    ~CameraSystem() = default;
@@ -21,48 +21,48 @@
 //        return m_cameraPos;
 //    }
 //
-//    // Обновление камеры на основе ввода
+//    // РћР±РЅРѕРІР»РµРЅРёРµ РєР°РјРµСЂС‹ РЅР° РѕСЃРЅРѕРІРµ РІРІРѕРґР°
 //    void Update(float deltaTime,
-//        bool rotateLeft, bool rotateRight,   // стрелки влево/вправо - вращение
-//        bool zoomIn, bool zoomOut,           // стрелки вверх/вниз - приближение/отдаление
-//        bool moveUp, bool moveDown,          // Q/E - перемещение вверх/вниз
+//        bool rotateLeft, bool rotateRight,   // СЃС‚СЂРµР»РєРё РІР»РµРІРѕ/РІРїСЂР°РІРѕ - РІСЂР°С‰РµРЅРёРµ
+//        bool zoomIn, bool zoomOut,           // СЃС‚СЂРµР»РєРё РІРІРµСЂС…/РІРЅРёР· - РїСЂРёР±Р»РёР¶РµРЅРёРµ/РѕС‚РґР°Р»РµРЅРёРµ
+//        bool moveUp, bool moveDown,          // Q/E - РїРµСЂРµРјРµС‰РµРЅРёРµ РІРІРµСЂС…/РІРЅРёР·
 //        float mouseDeltaX, float mouseDeltaY, float scrollDelta) {
 //
-//        // ========== ВРАЩЕНИЕ (СТРЕЛКИ ВЛЕВО/ВПРАВО) ==========
+//        // ========== Р’Р РђР©Р•РќРР• (РЎРўР Р•Р›РљР Р’Р›Р•Р’Рћ/Р’РџР РђР’Рћ) ==========
 //        float rotateSpeed = 2.0f * deltaTime;
 //        if (rotateLeft) m_cameraAngleX += rotateSpeed;
 //        if (rotateRight) m_cameraAngleX -= rotateSpeed;
 //
-//        // ========== ПРИБЛИЖЕНИЕ/ОТДАЛЕНИЕ (СТРЕЛКИ ВВЕРХ/ВНИЗ) ==========
+//        // ========== РџР РР‘Р›РР–Р•РќРР•/РћРўР”РђР›Р•РќРР• (РЎРўР Р•Р›РљР Р’Р’Р•Р РҐ/Р’РќРР—) ==========
 //        float zoomSpeed = 5.0f * deltaTime;
-//        if (zoomIn) m_cameraRadius -= zoomSpeed;     // стрелка вверх - приближение
-//        if (zoomOut) m_cameraRadius += zoomSpeed;    // стрелка вниз - отдаление
+//        if (zoomIn) m_cameraRadius -= zoomSpeed;     // СЃС‚СЂРµР»РєР° РІРІРµСЂС… - РїСЂРёР±Р»РёР¶РµРЅРёРµ
+//        if (zoomOut) m_cameraRadius += zoomSpeed;    // СЃС‚СЂРµР»РєР° РІРЅРёР· - РѕС‚РґР°Р»РµРЅРёРµ
 //
-//        // ========== ПЕРЕМЕЩЕНИЕ ВВЕРХ/ВНИЗ (Q/E) ==========
+//        // ========== РџР•Р Р•РњР•Р©Р•РќРР• Р’Р’Р•Р РҐ/Р’РќРР— (Q/E) ==========
 //        float heightSpeed = 3.0f * deltaTime;
-//        if (moveUp) m_cameraHeight += heightSpeed;   // Q - вверх
-//        if (moveDown) m_cameraHeight -= heightSpeed; // E - вниз
+//        if (moveUp) m_cameraHeight += heightSpeed;   // Q - РІРІРµСЂС…
+//        if (moveDown) m_cameraHeight -= heightSpeed; // E - РІРЅРёР·
 //
-//        // ========== ВРАЩЕНИЕ МЫШЬЮ (ПКМ) ==========
+//        // ========== Р’Р РђР©Р•РќРР• РњР«РЁР¬Р® (РџРљРњ) ==========
 //        if (mouseDeltaX != 0.0f) {
 //            float mouseRotateSpeed = 0.005f;
 //            m_cameraAngleX += mouseDeltaX * mouseRotateSpeed;
 //        }
 //
-//        // ========== МАСШТАБИРОВАНИЕ МЫШЬЮ (ЛКМ) ==========
+//        // ========== РњРђРЎРЁРўРђР‘РР РћР’РђРќРР• РњР«РЁР¬Р® (Р›РљРњ) ==========
 //        if (scrollDelta != 0.0f) {
 //            m_cameraRadius -= scrollDelta * 0.5f;
 //        }
 //
-//        // Ограничиваем радиус
+//        // РћРіСЂР°РЅРёС‡РёРІР°РµРј СЂР°РґРёСѓСЃ
 //        if (m_cameraRadius < 3.0f) m_cameraRadius = 3.0f;
 //        if (m_cameraRadius > 20.0f) m_cameraRadius = 20.0f;
 //
-//        // Ограничиваем высоту
+//        // РћРіСЂР°РЅРёС‡РёРІР°РµРј РІС‹СЃРѕС‚Сѓ
 //        if (m_cameraHeight < 0.5f) m_cameraHeight = 0.5f;
 //        if (m_cameraHeight > 8.0f) m_cameraHeight = 8.0f;
 //
-//        // Вычисляем позицию камеры в сферических координатах
+//        // Р’С‹С‡РёСЃР»СЏРµРј РїРѕР·РёС†РёСЋ РєР°РјРµСЂС‹ РІ СЃС„РµСЂРёС‡РµСЃРєРёС… РєРѕРѕСЂРґРёРЅР°С‚Р°С…
 //        float x = sin(m_cameraAngleX) * m_cameraRadius;
 //        float z = cos(m_cameraAngleX) * m_cameraRadius;
 //        float y = m_cameraHeight;
@@ -71,20 +71,20 @@
 //        m_cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
 //    }
 //
-//    // Обновление с World (для совместимости)
+//    // РћР±РЅРѕРІР»РµРЅРёРµ СЃ World (РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё)
 //    void Update(World& world, float deltaTime,
 //        bool forward, bool backward, bool left, bool right,
 //        bool down, bool up,
 //        float mouseDeltaX, float mouseDeltaY, float scrollDelta) {
-//        // forward = стрелка вверх (приближение)
-//        // backward = стрелка вниз (отдаление)
-//        // left = стрелка влево (вращение влево)
-//        // right = стрелка вправо (вращение вправо)
-//        // up = Q (вверх)
-//        // down = E (вниз)
+//        // forward = СЃС‚СЂРµР»РєР° РІРІРµСЂС… (РїСЂРёР±Р»РёР¶РµРЅРёРµ)
+//        // backward = СЃС‚СЂРµР»РєР° РІРЅРёР· (РѕС‚РґР°Р»РµРЅРёРµ)
+//        // left = СЃС‚СЂРµР»РєР° РІР»РµРІРѕ (РІСЂР°С‰РµРЅРёРµ РІР»РµРІРѕ)
+//        // right = СЃС‚СЂРµР»РєР° РІРїСЂР°РІРѕ (РІСЂР°С‰РµРЅРёРµ РІРїСЂР°РІРѕ)
+//        // up = Q (РІРІРµСЂС…)
+//        // down = E (РІРЅРёР·)
 //        Update(deltaTime, left, right, forward, backward, up, down, mouseDeltaX, mouseDeltaY, scrollDelta);
 //
-//        // Синхронизируем с компонентом Camera в World
+//        // РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµРј СЃ РєРѕРјРїРѕРЅРµРЅС‚РѕРј Camera РІ World
 //        Entity cameraEntity = GetCameraEntity(world);
 //        if (cameraEntity != 0) {
 //            Camera* camera = world.GetCamera(cameraEntity);
@@ -95,7 +95,7 @@
 //        }
 //    }
 //
-//    // Получить матрицу вида (View)
+//    // РџРѕР»СѓС‡РёС‚СЊ РјР°С‚СЂРёС†Сѓ РІРёРґР° (View)
 //    glm::mat4 GetViewMatrix() const {
 //        return glm::lookAt(m_cameraPos, m_cameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
 //    }
@@ -104,7 +104,7 @@
 //        return GetViewMatrix();
 //    }
 //
-//    // Получить матрицу проекции (Projection)
+//    // РџРѕР»СѓС‡РёС‚СЊ РјР°С‚СЂРёС†Сѓ РїСЂРѕРµРєС†РёРё (Projection)
 //    glm::mat4 GetProjectionMatrix(float aspectRatio) const {
 //        return glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 100.0f);
 //    }
@@ -113,7 +113,7 @@
 //        return GetProjectionMatrix(aspectRatio);
 //    }
 //
-//    // ========== ДЛЯ СОХРАНЕНИЯ/ЗАГРУЗКИ ==========
+//    // ========== Р”Р›РЇ РЎРћРҐР РђРќР•РќРРЇ/Р—РђР“Р РЈР—РљР ==========
 //    void GetCameraState(glm::vec3& pos, glm::vec3& target, float& radius, float& angleX, float& height) const {
 //        pos = m_cameraPos;
 //        target = m_cameraTarget;
@@ -143,9 +143,9 @@
 //private:
 //    glm::vec3 m_cameraPos;
 //    glm::vec3 m_cameraTarget;
-//    float m_cameraRadius;      // расстояние от центра
-//    float m_cameraAngleX;      // угол вокруг Y (влево-вправо)
-//    float m_cameraHeight;      // высота камеры
+//    float m_cameraRadius;      // СЂР°СЃСЃС‚РѕСЏРЅРёРµ РѕС‚ С†РµРЅС‚СЂР°
+//    float m_cameraAngleX;      // СѓРіРѕР» РІРѕРєСЂСѓРі Y (РІР»РµРІРѕ-РІРїСЂР°РІРѕ)
+//    float m_cameraHeight;      // РІС‹СЃРѕС‚Р° РєР°РјРµСЂС‹
 //};
 
 #pragma once
@@ -168,24 +168,24 @@ public:
 
     ~CameraSystem() = default;
 
-    // Обновление камеры на основе ввода
+    // РћР±РЅРѕРІР»РµРЅРёРµ РєР°РјРµСЂС‹ РЅР° РѕСЃРЅРѕРІРµ РІРІРѕРґР°
     void Update(float deltaTime,
-        bool moveForward, bool moveBackward,   // стрелки вверх/вниз
-        bool moveLeft, bool moveRight,         // стрелки влево/вправо
+        bool moveForward, bool moveBackward,   // СЃС‚СЂРµР»РєРё РІРІРµСЂС…/РІРЅРёР·
+        bool moveLeft, bool moveRight,         // СЃС‚СЂРµР»РєРё РІР»РµРІРѕ/РІРїСЂР°РІРѕ
         bool moveUp, bool moveDown,            // Q / E
-        float mouseDeltaX, float mouseDeltaY,  // для вращения (ПКМ)
-        float scrollDelta) {                   // для приближения/отдаления (ЛКМ / колесико)
+        float mouseDeltaX, float mouseDeltaY,  // РґР»СЏ РІСЂР°С‰РµРЅРёСЏ (РџРљРњ)
+        float scrollDelta) {                   // РґР»СЏ РїСЂРёР±Р»РёР¶РµРЅРёСЏ/РѕС‚РґР°Р»РµРЅРёСЏ (Р›РљРњ / РєРѕР»РµСЃРёРєРѕ)
 
         float speed = 3.0f * deltaTime;
         float rotateSpeed = 0.005f;
 
-        // === 1. ДВИЖЕНИЕ КАМЕРЫ (СТРЕЛКИ) ===
-        // Получаем направления камеры
+        // === 1. Р”Р’РР–Р•РќРР• РљРђРњР•Р Р« (РЎРўР Р•Р›РљР) ===
+        // РџРѕР»СѓС‡Р°РµРј РЅР°РїСЂР°РІР»РµРЅРёСЏ РєР°РјРµСЂС‹
         glm::vec3 forward = glm::normalize(m_cameraTarget - m_cameraPos);
         glm::vec3 right = glm::normalize(glm::cross(forward, m_cameraUp));
         glm::vec3 up = m_cameraUp;
 
-        // Движение вперед/назад
+        // Р”РІРёР¶РµРЅРёРµ РІРїРµСЂРµРґ/РЅР°Р·Р°Рґ
         if (moveForward) {
             m_cameraPos += forward * speed;
             m_cameraTarget += forward * speed;
@@ -195,7 +195,7 @@ public:
             m_cameraTarget -= forward * speed;
         }
 
-        // Движение влево/вправо
+        // Р”РІРёР¶РµРЅРёРµ РІР»РµРІРѕ/РІРїСЂР°РІРѕ
         if (moveLeft) {
             m_cameraPos -= right * speed;
             m_cameraTarget -= right * speed;
@@ -205,7 +205,7 @@ public:
             m_cameraTarget += right * speed;
         }
 
-        // Движение вверх/вниз
+        // Р”РІРёР¶РµРЅРёРµ РІРІРµСЂС…/РІРЅРёР·
         if (moveUp) {
             m_cameraPos += up * speed;
             m_cameraTarget += up * speed;
@@ -215,24 +215,24 @@ public:
             m_cameraTarget -= up * speed;
         }
 
-        // === 2. ВРАЩЕНИЕ КАМЕРЫ (ПКМ) ===
+        // === 2. Р’Р РђР©Р•РќРР• РљРђРњР•Р Р« (РџРљРњ) ===
         if (mouseDeltaX != 0.0f || mouseDeltaY != 0.0f) {
-            // Вектор от камеры к цели
+            // Р’РµРєС‚РѕСЂ РѕС‚ РєР°РјРµСЂС‹ Рє С†РµР»Рё
             glm::vec3 dir = m_cameraPos - m_cameraTarget;
             float distance = glm::length(dir);
 
-            // Переводим в сферические координаты
+            // РџРµСЂРµРІРѕРґРёРј РІ СЃС„РµСЂРёС‡РµСЃРєРёРµ РєРѕРѕСЂРґРёРЅР°С‚С‹
             float yaw = atan2(dir.x, dir.z);
             float pitch = asin(dir.y / distance);
 
-            // Изменяем углы
+            // РР·РјРµРЅСЏРµРј СѓРіР»С‹
             yaw += mouseDeltaX * rotateSpeed;
             pitch -= mouseDeltaY * rotateSpeed;
 
-            // Ограничиваем pitch, чтобы камера не переворачивалась
+            // РћРіСЂР°РЅРёС‡РёРІР°РµРј pitch, С‡С‚РѕР±С‹ РєР°РјРµСЂР° РЅРµ РїРµСЂРµРІРѕСЂР°С‡РёРІР°Р»Р°СЃСЊ
             pitch = glm::clamp(pitch, -1.4f, 1.4f);
 
-            // Вычисляем новую позицию
+            // Р’С‹С‡РёСЃР»СЏРµРј РЅРѕРІСѓСЋ РїРѕР·РёС†РёСЋ
             dir.x = distance * sin(yaw) * cos(pitch);
             dir.y = distance * sin(pitch);
             dir.z = distance * cos(yaw) * cos(pitch);
@@ -240,7 +240,7 @@ public:
             m_cameraPos = m_cameraTarget + dir;
         }
 
-        // === 3. ПРИБЛИЖЕНИЕ/ОТДАЛЕНИЕ (ЛКМ / колесико) ===
+        // === 3. РџР РР‘Р›РР–Р•РќРР•/РћРўР”РђР›Р•РќРР• (Р›РљРњ / РєРѕР»РµСЃРёРєРѕ) ===
         if (scrollDelta != 0.0f) {
             glm::vec3 dir = m_cameraPos - m_cameraTarget;
             float distance = glm::length(dir);
@@ -252,7 +252,7 @@ public:
             m_cameraPos = m_cameraTarget + dir;
         }
 
-        // Синхронизируем с компонентом Camera в World
+        // РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµРј СЃ РєРѕРјРїРѕРЅРµРЅС‚РѕРј Camera РІ World
         if (m_cameraEntity != 0) {
             Camera* camera = m_world->GetCamera(m_cameraEntity);
             if (camera) {
@@ -262,7 +262,7 @@ public:
         }
     }
 
-    // Обновление с World (для совместимости)
+    // РћР±РЅРѕРІР»РµРЅРёРµ СЃ World (РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё)
     void Update(World& world, float deltaTime,
         bool moveForward, bool moveBackward,
         bool moveLeft, bool moveRight,
@@ -272,7 +272,7 @@ public:
 
         m_world = &world;
 
-        // Находим камеру в World (если еще не найдена)
+        // РќР°С…РѕРґРёРј РєР°РјРµСЂСѓ РІ World (РµСЃР»Рё РµС‰Рµ РЅРµ РЅР°Р№РґРµРЅР°)
         if (m_cameraEntity == 0) {
             auto entities = world.GetRenderableEntities();
             for (Entity e : entities) {
@@ -283,7 +283,7 @@ public:
             }
         }
 
-        // Синхронизируем начальное состояние из компонента
+        // РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµРј РЅР°С‡Р°Р»СЊРЅРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ РёР· РєРѕРјРїРѕРЅРµРЅС‚Р°
         if (m_cameraEntity != 0) {
             Camera* camera = world.GetCamera(m_cameraEntity);
             if (camera) {
@@ -291,7 +291,7 @@ public:
                 m_cameraTarget = camera->target;
                 m_cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-                // Вычисляем расстояние для zoom
+                // Р’С‹С‡РёСЃР»СЏРµРј СЂР°СЃСЃС‚РѕСЏРЅРёРµ РґР»СЏ zoom
                 m_cameraDistance = glm::length(m_cameraPos - m_cameraTarget);
             }
         }
@@ -300,7 +300,7 @@ public:
             moveUp, moveDown, mouseDeltaX, mouseDeltaY, scrollDelta);
     }
 
-    // Геттеры
+    // Р“РµС‚С‚РµСЂС‹
     glm::vec3 GetCameraPosition() const { return m_cameraPos; }
     glm::mat4 GetViewMatrix() const {
         return glm::lookAt(m_cameraPos, m_cameraTarget, m_cameraUp);
