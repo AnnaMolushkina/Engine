@@ -25,5 +25,6 @@ struct TextureData : public Resource {
     size_t GetDataSize() const { return static_cast<size_t>(width) * height * 4; }
 
     static std::shared_ptr<TextureData> LoadFromFile(const std::string& path);
+    static bool LoadInto(TextureData& out, const std::string& path);
     ComPtr<ID3D12Resource> uploadBuffer;
 };

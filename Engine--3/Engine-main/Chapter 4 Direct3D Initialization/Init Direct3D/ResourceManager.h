@@ -7,58 +7,63 @@
 #include "Texture.h"
 #include "MeshData.h"
 #include "TextureData.h"
+#include <atomic>
+#include <functional>
+#include <mutex>
 
+struct MeshData;
+struct TextureData;
+
+// Единая точка доступа к ресурсам (правило семестра: один движок — одна система фоновой работы).
+// Асинхронная загрузка L1 (ТЗ 2.2):
+//   * RequestMesh / RequestTexture возвращают shared_ptr немедленно;
+//   * фоновая задача в job system делает file I/O + парсинг/декод (Assimp / stb_image);
+//   * финализация (GPU-аплоад) — через JobSystem::RunOnMainThread, с лимитом на кадр;
+//   * до готовности RenderSystem рисует placeholder (куб / белая текстура);
+//   * шатдаун корректный: фоновые задачи проверяют JobSystem::IsShuttingDown().
 class ResourceManager {
 public:
-    static ResourceManager& Get() {
-        static ResourceManager instance;
-        return instance;
-    }
+    using MeshUploader = std::function<bool(MeshData&)>;
+    using TextureUploader = std::function<bool(TextureData&)>;
 
-    // Простая версия для MeshData (без полного шаблона пока)
-    std::shared_ptr<MeshData> LoadMesh(const std::string& path) {
-        auto it = m_meshes.find(path);
-        if (it != m_meshes.end()) {
-            Logger::Info("[ResourceManager] Mesh cache hit: " + path);
-            return it->second;
-        }
+    static ResourceManager& Get();
 
-        auto mesh = MeshData::LoadFromFile(path);
-        if (mesh && mesh->loaded) {
-            m_meshes[path] = mesh;
-            Logger::Info("[ResourceManager] Mesh loaded (CPU): " + path);
-            return mesh;
-        }
+    // Регистрирует колбэки GPU-аплоада. Вызывается один раз из Application::Initialize
+    // после создания D3D12RenderAdapter. Колбэки исполняются на главном потоке.
+    void SetUploaders(MeshUploader meshUploader, TextureUploader textureUploader);
 
-        Logger::Error("[ResourceManager] Failed to load mesh: " + path);
-        return nullptr;
-    }
+    // ---------- Async API (L1) ----------
+    // Возврат немедленный. Готовность:
+    //   mesh   — mesh->gpuMesh.IndexCount > 0
+    //   texture— texture->srvIndex >= 0
+    // До готовности RenderSystem рисует placeholder.
+    std::shared_ptr<MeshData>    RequestMesh(const std::string& path);
+    std::shared_ptr<TextureData> RequestTexture(const std::string& path);
 
-    std::shared_ptr<TextureData> LoadTextureData(const std::string& path) {
-        auto it = m_texturesData.find(path);
-        if (it != m_texturesData.end()) {
-            Logger::Info("[ResourceManager] TextureData cache hit: " + path);
-            return it->second;
-        }
+    // ---------- Sync API ----------
+    // Оставлены для случаев, когда ресурс нужен прямо сейчас (тесты, fallback).
+    // Блокируют вызывающий поток.
+    std::shared_ptr<MeshData>    LoadMesh(const std::string& path);
+    std::shared_ptr<TextureData> LoadTextureData(const std::string& path);
 
-        auto tex = TextureData::LoadFromFile(path);
-        if (tex && tex->loaded) {
-            m_texturesData[path] = tex;
-            Logger::Info("[ResourceManager] TextureData loaded: " + path);
-            return tex;
-        }
-        return nullptr;
-    }
+    // Сколько загрузок ещё в полёте (для HUD/демо).
+    int  PendingLoads() const { return m_pendingLoads.load(std::memory_order_relaxed); }
 
-    void Clear() {
-        m_textures.clear();
-        m_meshes.clear();
-        m_texturesData.clear(); // раньше текстуры оставались в кэше после Clear()
-    }
+    // Очистить кэш (шатдаун, демо перезагрузки).
+    void Clear();
 
 private:
     ResourceManager() = default;
-    std::unordered_map<std::string, std::shared_ptr<OLDTexture>> m_textures;
-    std::unordered_map<std::string, std::shared_ptr<MeshData>> m_meshes;
-    std::unordered_map<std::string, std::shared_ptr<TextureData>> m_texturesData;
+    ResourceManager(const ResourceManager&) = delete;
+    ResourceManager& operator=(const ResourceManager&) = delete;
+
+    void ScheduleMeshLoad(const std::string& path, std::shared_ptr<MeshData> mesh);
+    void ScheduleTextureLoad(const std::string& path, std::shared_ptr<TextureData> texture);
+
+    std::mutex m_mutex;
+    std::unordered_map<std::string, std::shared_ptr<MeshData>>    m_meshes;
+    std::unordered_map<std::string, std::shared_ptr<TextureData>> m_textures;
+    MeshUploader    m_meshUploader;
+    TextureUploader m_textureUploader;
+    std::atomic<int> m_pendingLoads{ 0 };
 };

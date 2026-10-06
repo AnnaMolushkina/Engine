@@ -43,4 +43,8 @@ struct MeshData : public Resource {
     bool IsValid() const { return !subMeshes.empty(); }
 
     static std::shared_ptr<MeshData> LoadFromFile(const std::string& path);
+
+    // Заполняет УЖЕ СУЩЕСТВУЮЩИЙ MeshData (используется async-путём, чтобы shared_ptr
+   // оставался стабильным: RenderSystem сразу видит изменения, когда загрузка завершится).
+    static bool LoadInto(MeshData& out, const std::string& path);
 };

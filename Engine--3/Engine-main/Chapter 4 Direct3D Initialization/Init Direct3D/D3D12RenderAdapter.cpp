@@ -483,15 +483,14 @@ bool D3D12RenderAdapter::CreateTexture(TextureData& textureData, ID3D12Device* d
         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     cmdList->ResourceBarrier(1, &barrier);
 
-    textureData.textureResource = texture;
-    textureData.uploadBuffer = uploadBuffer;   // сохраняем, чтобы не удалился до выполнения команд
-
     if (m_nextSRVIndex >= 64) {
         Logger::Error("CreateTexture: SRV heap is full (64 textures)");
         return false;
     }
     // Назначаем индекс SRV
     int index = m_nextSRVIndex++;
+    textureData.textureResource = texture;
+    textureData.uploadBuffer = uploadBuffer;   // сохраняем, чтобы не удалился до выполнения команд
     textureData.srvIndex = index;
     m_textureSRVIndices[textureData.filePath] = index;
 
@@ -593,27 +592,24 @@ void D3D12RenderAdapter::CreateTextureSRV(ComPtr<ID3D12Resource> textureResource
 
 bool D3D12RenderAdapter::UploadTextureToGPU(TextureData& textureData)
 {
-    if (!textureData.IsValid() || textureData.srvIndex >= 0)
-        return false;
+    // Уже на GPU — не ошибка (uploader вызывается один раз, но на всякий случай идемпотентно)
+    if (textureData.srvIndex >= 0) return true;
+    if (!textureData.IsValid())   return false;
+
     assert(mCurrentWindow < 0 && "UploadTextureToGPU must be called outside BeginFrame/EndFrame");
 
-    // Открываем command list заново
     ThrowIfFailed(mApp->mDirectCmdListAlloc->Reset());
     ThrowIfFailed(mApp->mCommandList->Reset(mApp->mDirectCmdListAlloc.Get(), nullptr));
 
     bool success = CreateTexture(textureData, mApp->md3dDevice.Get(), mApp->mCommandList.Get());
-    ThrowIfFailed(mApp->mCommandList->Close()); // закрываем и при ошибке, иначе следующий Reset упадёт
+    ThrowIfFailed(mApp->mCommandList->Close());
 
     if (success) {
         ID3D12CommandList* cmdLists[] = { mApp->mCommandList.Get() };
         mApp->mCommandQueue->ExecuteCommandLists(1, cmdLists);
-        mApp->FlushCommandQueue();        // Ждём завершения копирования
-        textureData.uploadBuffer.Reset(); // копирование выполнено
+        mApp->FlushCommandQueue();
+        textureData.uploadBuffer.Reset();
     }
-    else {
-        Logger::Error("Failed to upload texture to GPU: " + textureData.filePath);
-    }
-
     return success;
 }
 

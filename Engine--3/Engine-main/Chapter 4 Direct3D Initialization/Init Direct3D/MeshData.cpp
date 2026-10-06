@@ -23,19 +23,26 @@ uint32_t MeshData::GetTotalIndexCount() const {
 
 std::shared_ptr<MeshData> MeshData::LoadFromFile(const std::string& path) {
     auto mesh = std::make_shared<MeshData>();
-    mesh->filePath = path;
-    mesh->path = path;   // для базового Resource
+    if (!LoadInto(*mesh, path)) return nullptr;
+    return mesh;
+}
+
+bool MeshData::LoadInto(MeshData& mesh, const std::string& path) {
+    mesh.filePath = path;
+    mesh.path = path;
+    mesh.subMeshes.clear();
+    mesh.gpuMesh = GPUMesh{};
+    mesh.boundingRadius = 1.0f;
+    mesh.loaded = false;
 
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path,
-        aiProcess_Triangulate |
-        aiProcess_GenSmoothNormals |
-        aiProcess_FlipUVs |
-        aiProcess_JoinIdenticalVertices);
+        aiProcess_Triangulate | aiProcess_GenSmoothNormals |
+        aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
 
     if (!scene || scene->mNumMeshes == 0) {
         Logger::Error("Assimp: Failed to load model: " + path);
-        return nullptr;
+        return false;
     }
 
     aiMesh* aimesh = scene->mMeshes[0];
@@ -45,66 +52,28 @@ std::shared_ptr<MeshData> MeshData::LoadFromFile(const std::string& path) {
     for (unsigned int i = 0; i < aimesh->mNumVertices; ++i) {
         Vertex3D v;
         v.position = glm::vec3(aimesh->mVertices[i].x, aimesh->mVertices[i].y, aimesh->mVertices[i].z);
-
         if (aimesh->HasNormals())
             v.normal = glm::vec3(aimesh->mNormals[i].x, aimesh->mNormals[i].y, aimesh->mNormals[i].z);
-
-        if (aimesh->HasTextureCoords(0)) {
+        if (aimesh->HasTextureCoords(0))
             v.texCoord = glm::vec2(aimesh->mTextureCoords[0][i].x, aimesh->mTextureCoords[0][i].y);
-            if (i < 5) {  // первые 5 вершин
-                Logger::Info("UV for vertex " + std::to_string(i) + ": ("
-                    + std::to_string(v.texCoord.x) + ", " + std::to_string(v.texCoord.y) + ")");
-            }
-        }
-        else {
-            v.texCoord = glm::vec2(0.0f, 0.0f);
-            if (i < 5) {
-                Logger::Warning("Mesh has NO texture coordinates! Using (0,0)");
-            }
-        }
-
-        // В MeshData.cpp, после загрузки UV:
-        if (aimesh->HasTextureCoords(0)) {
-            v.texCoord = glm::vec2(aimesh->mTextureCoords[0][i].x, aimesh->mTextureCoords[0][i].y);
-            // Отладка: вывести первые несколько UV
-            if (i < 3) {
-                Logger::Info("UV " + std::to_string(i) + ": (" +
-                    std::to_string(v.texCoord.x) + ", " +
-                    std::to_string(v.texCoord.y) + ")");
-            }
-        }
-
         subMesh.vertices.push_back(v);
     }
-
     for (unsigned int i = 0; i < aimesh->mNumFaces; ++i) {
         aiFace face = aimesh->mFaces[i];
-        for (unsigned int j = 0; j < face.mNumIndices; ++j) {
+        for (unsigned int j = 0; j < face.mNumIndices; ++j)
             subMesh.indices.push_back(face.mIndices[j]);
-        }
     }
 
     float maxDistSq = 0.0f;
     for (const Vertex3D& v : subMesh.vertices)
         maxDistSq = std::max(maxDistSq, glm::dot(v.position, v.position));
-    mesh->boundingRadius = std::sqrt(maxDistSq);
+    mesh.boundingRadius = std::sqrt(maxDistSq);
 
-    mesh->subMeshes.push_back(std::move(subMesh));
-    mesh->loaded = true;
+    mesh.subMeshes.push_back(std::move(subMesh));
+    mesh.loaded = true;
 
-    Logger::Info("Mesh loaded successfully: " + path +
-        " | Vertices: " + std::to_string(mesh->GetTotalVertexCount()) +
-        " | Indices: " + std::to_string(mesh->GetTotalIndexCount()));
-
-    if (mesh->subMeshes.size() > 0 && mesh->subMeshes[0].vertices.size() > 0) {
-        Logger::Info("First 3 vertices of loaded mesh:");
-        for (int i = 0; i < 3 && i < mesh->subMeshes[0].vertices.size(); i++) {
-            Logger::Info("  v" + std::to_string(i) + ": (" +
-                std::to_string(mesh->subMeshes[0].vertices[i].position.x) + ", " +
-                std::to_string(mesh->subMeshes[0].vertices[i].position.y) + ", " +
-                std::to_string(mesh->subMeshes[0].vertices[i].position.z) + ")");
-        }
-    }
-
-    return mesh;
+    Logger::Info("Mesh loaded (CPU): " + path +
+        " | V:" + std::to_string(mesh.GetTotalVertexCount()) +
+        " | I:" + std::to_string(mesh.GetTotalIndexCount()));
+    return true;
 }

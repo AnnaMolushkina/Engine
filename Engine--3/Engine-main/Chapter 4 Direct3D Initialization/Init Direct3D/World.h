@@ -134,6 +134,16 @@ public:
         return result;
     }
 
+   // Все сущности, у которых есть Camera-компонент.
+   // GetRenderableEntities() не подходит: камера не имеет MeshRenderer.
+    std::vector<Entity> GetCameraEntities() const {
+        std::vector<Entity> result;
+        for (Entity e : entities) {
+            if (cameras.find(e) != cameras.end()) result.push_back(e);
+        }
+        return result;
+    }
+
     // ========== МЕТОДЫ ДЛЯ ПРОСТРАНСТВЕННОЙ СЕТКИ ==========
     void UpdateSpatialGrid() {
         m_spatialGrid.Clear();

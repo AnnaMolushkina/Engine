@@ -8,13 +8,16 @@
 #include <fstream>
 #include <vector>
 #include <algorithm>
+#include "ResourceManager.h"
+#include <glm/glm.hpp>
 
 using json = nlohmann::json;
 
 class SceneSerializer {
 public:
     // Сохранить сцену в JSON файл (с состоянием анимаций)
-    static bool SaveScene(const World& world, const std::string& filename,
+    static bool SaveScene(const World& world, const std::string& filename, 
+        Entity cameraEntity,
         float rotationAngle, float jumpPhase, float circleY) {
         json sceneJson;
 
@@ -47,6 +50,16 @@ public:
                 entityJson["meshRenderer"]["color"]["g"] = meshRenderer->color.g;
                 entityJson["meshRenderer"]["color"]["b"] = meshRenderer->color.b;
                 entityJson["meshRenderer"]["color"]["a"] = meshRenderer->color.a;
+                entityJson["meshRenderer"]["useLoadedMesh"] = meshRenderer->useLoadedMesh;
+
+                // Пути к ресурсам (не сами shared_ptr — их сериализовать нельзя).
+                // При загрузке сцены ресурсы снова запросятся через ResourceManager.
+                if (meshRenderer->mesh) {
+                    entityJson["meshRenderer"]["meshPath"] = meshRenderer->mesh->filePath;
+                }
+                if (meshRenderer->texture) {
+                    entityJson["meshRenderer"]["texturePath"] = meshRenderer->texture->filePath;
+                }
             }
 
             const Tag* tag = const_cast<World&>(world).GetTag(e);
@@ -62,6 +75,29 @@ public:
         sceneJson["animationState"]["jumpPhase"] = jumpPhase;
         sceneJson["animationState"]["circleY"] = circleY;
 
+       // Камера: у неё нет MeshRenderer, поэтому в цикле по GetRenderableEntities()
+       // она не попадается. Сохраняем её явно по Entity-id.
+        const Camera* camera = const_cast<World&>(world).GetCamera(cameraEntity);
+        if (camera) {
+            sceneJson["camera"]["position"]["x"] = camera->position.x;
+            sceneJson["camera"]["position"]["y"] = camera->position.y;
+            sceneJson["camera"]["position"]["z"] = camera->position.z;
+            sceneJson["camera"]["target"]["x"] = camera->target.x;
+            sceneJson["camera"]["target"]["y"] = camera->target.y;
+            sceneJson["camera"]["target"]["z"] = camera->target.z;
+            sceneJson["camera"]["zoom"] = camera->zoom;
+            /*sceneJson["camera"]["yaw"] = camera->yaw;
+            sceneJson["camera"]["pitch"] = camera->pitch;*/
+
+            Logger::Info("SceneSerializer: saved camera at (" +
+                std::to_string(camera->position.x) + ", " +
+                std::to_string(camera->position.y) + ", " +
+                std::to_string(camera->position.z) + ")");
+        }
+        else {
+            Logger::Warning("SceneSerializer: camera entity is null, camera NOT saved");
+        }
+
         sceneJson["version"] = 1;
         sceneJson["entityCount"] = entities.size();
 
@@ -76,7 +112,10 @@ public:
     // Загрузить сцену из JSON файла (с восстановлением состояния анимаций)
     static bool LoadScene(World& world, const std::string& filename,
         Entity& outTriangle, Entity& outCircle, Entity& outSquare,
-        float& outRotationAngle, float& outJumpPhase, float& outCircleY) {
+        float& outRotationAngle, float& outJumpPhase, float& outCircleY,
+        glm::vec3& outCameraPosition,
+        glm::vec3& outCameraTarget,
+        float& outCameraZoom) {
         std::ifstream file(filename);
         if (!file.is_open()) return false;
 
@@ -98,6 +137,29 @@ public:
             outRotationAngle = 0.0f;
             outJumpPhase = 0.0f;
             outCircleY = 0.0f;
+        }
+
+        // Камера: подгружаем, если есть; иначе дефолт
+        if (sceneJson.contains("camera")) {
+            const auto& c = sceneJson["camera"];
+            outCameraPosition.x = c["position"]["x"].get<float>();
+            outCameraPosition.y = c["position"]["y"].get<float>();
+            outCameraPosition.z = c["position"]["z"].get<float>();
+            outCameraTarget.x = c["target"]["x"].get<float>();
+            outCameraTarget.y = c["target"]["y"].get<float>();
+            outCameraTarget.z = c["target"]["z"].get<float>();
+            outCameraZoom = c["zoom"].get<float>();
+
+            Logger::Info("SceneSerializer: loaded camera at (" +
+                std::to_string(outCameraPosition.x) + ", " +
+                std::to_string(outCameraPosition.y) + ", " +
+                std::to_string(outCameraPosition.z) + ")");
+        }
+        else {
+            outCameraPosition = glm::vec3(0.0f, 2.0f, 6.0f);
+            outCameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
+            outCameraZoom = 6.0f;
+            Logger::Warning("SceneSerializer: no 'camera' in JSON, using defaults");
         }
 
         // Очищаем старую сцену
@@ -144,6 +206,22 @@ public:
                 mr.color.g = entityJson["meshRenderer"]["color"]["g"].get<float>();
                 mr.color.b = entityJson["meshRenderer"]["color"]["b"].get<float>();
                 mr.color.a = entityJson["meshRenderer"]["color"]["a"].get<float>();
+
+                if (entityJson["meshRenderer"].contains("useLoadedMesh"))
+                    mr.useLoadedMesh = entityJson["meshRenderer"]["useLoadedMesh"].get<bool>();
+
+                // ResourceManager дедуплицирует по пути: если ресурс уже в кэше,
+                // RequestXxx вернёт готовый shared_ptr; если нет — запустит фоновую загрузку.
+                if (entityJson["meshRenderer"].contains("meshPath")) {
+                    std::string meshPath = entityJson["meshRenderer"]["meshPath"].get<std::string>();
+                    if (!meshPath.empty())
+                        mr.mesh = ResourceManager::Get().RequestMesh(meshPath);
+                }
+                if (entityJson["meshRenderer"].contains("texturePath")) {
+                    std::string texPath = entityJson["meshRenderer"]["texturePath"].get<std::string>();
+                    if (!texPath.empty())
+                        mr.texture = ResourceManager::Get().RequestTexture(texPath);
+                }
             }
 
             // Загружаем Tag

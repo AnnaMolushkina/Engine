@@ -158,14 +158,32 @@ void Application::Shutdown()
 }
 
 void Application::SaveScene(const std::string& filename) {
-    // Сохраняем текущую позицию Y ромба
-    Transform* t = m_world.GetTransform(m_circle);
-    float circleY = 0.0f;
-    if (t) {
-        circleY = t->position.y;
+    // Источник истины во время игры — CameraSystem; перед записью
+    // подтягиваем позицию в Camera-компонент World.
+    if (m_cameraSystem && m_cameraEntity != 0) {
+        if (Camera* cam = m_world.GetCamera(m_cameraEntity)) {
+            cam->position = m_cameraSystem->GetCameraPosition();
+            // target CameraSystem каждый кадр уже пишет в component в Update()
+        }
     }
 
-    if (SceneSerializer::SaveScene(m_world, filename, m_rotationAngle, m_jumpPhase, circleY)) {
+    const Camera* cam = m_world.GetCamera(m_cameraEntity);
+    if (cam) {
+        Logger::Info("SaveScene: camera at (" +
+            std::to_string(cam->position.x) + ", " +
+            std::to_string(cam->position.y) + ", " +
+            std::to_string(cam->position.z) + ")");
+    }
+    else {
+        Logger::Warning("SaveScene: camera entity is missing, camera will NOT be saved");
+    }
+
+    Transform* t = m_world.GetTransform(m_circle);
+    float circleY = 0.0f;
+    if (t) circleY = t->position.y;
+
+    if (SceneSerializer::SaveScene(m_world, filename, m_cameraEntity,
+        m_rotationAngle, m_jumpPhase, circleY)) {
         Logger::Info("Scene saved to " + filename);
     }
     else {
@@ -174,14 +192,22 @@ void Application::SaveScene(const std::string& filename) {
 }
 
 void Application::LoadScene(const std::string& filename) {
-    // Загрузка сцены удаляет все сущности - стресс-сцену убираем заранее (у неё есть указатели на Transform)
+    // Загрузка сцены удаляет все сущности — стресс-сцену убираем заранее
+    // (у неё есть указатели на Transform).
     DespawnStressScene();
+
+    // Старая камера: у неё нет MeshRenderer, SceneSerializer её не трогает.
+    if (m_cameraEntity != 0) {
+        m_world.DestroyEntity(m_cameraEntity);
+        m_cameraEntity = 0;
+    }
+    if (m_cameraSystem)
+        m_cameraSystem->Reset();
 
     // Останавливаем анимации
     m_isRotating = false;
     m_isScaling = false;
     m_isJumping = false;
-
     m_currentScale = 1.0f;
     m_scaleDirection = 1.0f;
 
@@ -191,9 +217,18 @@ void Application::LoadScene(const std::string& filename) {
     float loadedRotationAngle = 0.0f;
     float loadedJumpPhase = 0.0f;
     float loadedCircleY = 0.0f;
+    // Дефолты: используются и при ошибке загрузки, и если в JSON нет секции camera
+    glm::vec3 loadedCamPos(0.0f, 2.0f, 6.0f);
+    glm::vec3 loadedCamTarget(0.0f, 0.0f, 0.0f);
+    float loadedCamZoom = 6.0f;
 
-    if (SceneSerializer::LoadScene(m_world, filename, newTriangle, newCircle, newSquare,
-        loadedRotationAngle, loadedJumpPhase, loadedCircleY)) {
+    const bool ok = SceneSerializer::LoadScene(
+        m_world, filename,
+        newTriangle, newCircle, newSquare,
+        loadedRotationAngle, loadedJumpPhase, loadedCircleY,
+        loadedCamPos, loadedCamTarget, loadedCamZoom);
+
+    if (ok) {
         Logger::Info("Scene loaded from " + filename);
 
         if (newTriangle != 0) {
@@ -210,10 +245,8 @@ void Application::LoadScene(const std::string& filename) {
             m_jumpPhase = loadedJumpPhase;
             Transform* t = m_world.GetTransform(m_circle);
             if (t) {
-                // Устанавливаем позицию Y из сохранённого значения
                 t->position.y = loadedCircleY;
-                // НО исходная точка для прыжков = 0
-                m_originalY = 0.0f;  // ← всегда 0
+                m_originalY = 0.0f;
             }
             Logger::Info("Circle restored with Y: " + std::to_string(loadedCircleY));
         }
@@ -223,39 +256,74 @@ void Application::LoadScene(const std::string& filename) {
             if (t) m_currentScale = t->scale.x;
             Logger::Info("Square restored");
         }
-
     }
     else {
         Logger::Error("Failed to load scene from " + filename);
+        // loadedCam* остаются дефолтными
     }
+
+    // Ровно одна камера. Позиция — из JSON (если был) или дефолт.
+    m_cameraEntity = m_world.CreateEntity();
+    Camera& camera = m_world.AddCamera(m_cameraEntity);
+    camera.type = CameraType::Perspective;
+    camera.position = loadedCamPos;
+    camera.target = loadedCamTarget;
+    camera.zoom = loadedCamZoom;
+
+    Logger::Info("LoadScene: camera entity " + std::to_string(m_cameraEntity) +
+        " at (" + std::to_string(loadedCamPos.x) + ", " +
+        std::to_string(loadedCamPos.y) + ", " +
+        std::to_string(loadedCamPos.z) + ")");
+
+    // CameraSystem подхватит entity при следующем Update (через GetCameraEntities).
+    if (m_cameraSystem)
+        m_cameraSystem->Reset();
 }
 
 
 void Application::InitScene()
 {
-    // Очищаем старые сущности
+    //сначала убираем стресс-сцену
+    DespawnStressScene();
+   // Убираем рендерящиеся сущности и старую камеру (она не попадает под GetRenderableEntities:
+    // у неё нет MeshRenderer, только Camera-компонент).
     m_world.DestroyEntities(m_world.GetRenderableEntities());
-
-    D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
-
-    // Загружаем ресурсы 1 раз и сразу отправляем на GPU
-    // (раньше меши грузились на GPU прямо посреди кадра, внутри Draw)
-    auto steplerMesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
-    auto cubeMesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
-    if (d3d) {
-        if (steplerMesh) d3d->UploadMeshToGPU(*steplerMesh);
-        if (cubeMesh) d3d->UploadMeshToGPU(*cubeMesh);
+    if (m_cameraEntity != 0) {
+        m_world.DestroyEntity(m_cameraEntity);
+        m_cameraEntity = 0;
     }
 
-    auto steplerTex = ResourceManager::Get().LoadTextureData("assets/textures/texture_stepler.jpg");
-    if (steplerTex && d3d) {
-        d3d->UploadTextureToGPU(*steplerTex);
-    }
+    // Асинхронная загрузка L1: RequestXxx возвращает сразу, загрузка идёт в фоне
+    // (на job system, JobPriority::Low), GPU-аплоад — на главном потоке через памп.
+    // До готовности RenderSystem рисует placeholder: куб / белую текстуру.
+    auto steplerMesh = ResourceManager::Get().RequestMesh("assets/models/stepler.obj");
+    auto cubeMesh = ResourceManager::Get().RequestMesh("assets/models/cube.obj");
+    auto gojoMesh = ResourceManager::Get().RequestMesh("assets/models/Gojo.obj");
+    auto steplerTex = ResourceManager::Get().RequestTexture("assets/textures/texture_stepler.jpg");
+    auto heartTex = ResourceManager::Get().RequestTexture("assets/textures/heart.jpg");
+    auto gojoTex = ResourceManager::Get().RequestTexture("assets/textures/Gojotext.jpg");
 
-    auto heartTex = ResourceManager::Get().LoadTextureData("assets/textures/heart.jpg");
-    if (heartTex && d3d) {
-        d3d->UploadTextureToGPU(*heartTex);
-    }
+    //D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
+
+    //// Загружаем ресурсы 1 раз и сразу отправляем на GPU
+    //// (раньше меши грузились на GPU прямо посреди кадра, внутри Draw)
+    //auto steplerMesh = ResourceManager::Get().LoadMesh("assets/models/stepler.obj");
+    //auto cubeMesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
+    //if (d3d) {
+    //    if (steplerMesh) d3d->UploadMeshToGPU(*steplerMesh);
+    //    if (cubeMesh) d3d->UploadMeshToGPU(*cubeMesh);
+    //}
+
+    //auto steplerTex = ResourceManager::Get().LoadTextureData("assets/textures/texture_stepler.jpg");
+    //if (steplerTex && d3d) {
+    //    d3d->UploadTextureToGPU(*steplerTex);
+    //}
+
+    //auto heartTex = ResourceManager::Get().LoadTextureData("assets/textures/heart.jpg");
+    //if (heartTex && d3d) {
+    //    d3d->UploadTextureToGPU(*heartTex);
+    //}
+
 
     // Степлер 1 (слева, уменьшен)
     {
@@ -279,8 +347,8 @@ void Application::InitScene()
         t.position = glm::vec3(0.0f, 0.0f, 0.0f);
 
         MeshRenderer& mr = m_world.AddMeshRenderer(e);
-        mr.mesh = steplerMesh;
-        mr.texture = steplerTex;
+        mr.mesh = gojoMesh;
+        mr.texture = gojoTex;
         mr.useLoadedMesh = true;
 
         m_world.AddTag(e, "MainWindow");
@@ -365,6 +433,13 @@ bool Application::Initialize()
         return false;
     }
     mRenderAdapter->SetVSync(config.vsync);
+    // Мост job system ↔ ResourceManager ↔ D3D12: финализация ресурсов идёт
+    // на главном потоке через RunOnMainThread, а не посреди кадра.
+    D3D12RenderAdapter* d3dAdapter = static_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
+    ResourceManager::Get().SetUploaders(
+        [d3dAdapter](MeshData& mesh) { return d3dAdapter->UploadMeshToGPU(mesh); },
+        [d3dAdapter](TextureData& tex) { return d3dAdapter->UploadTextureToGPU(tex); }
+    );
 
     // СОЗДАЁМ RENDER SYSTEM И СЦЕНУ
     m_renderSystem = std::make_unique<RenderSystem>(mRenderAdapter.get());
@@ -682,6 +757,14 @@ void Application::Update(const GameTimer& gt)
                 mJobs.SetParallelEnabled(enabled);
                 Logger::Info(std::string("Job system parallel execution: ") + (enabled ? "ON" : "OFF"));
             }
+            if (input.WasKeyPressed('L')) {
+                // Демо async-загрузки L1: сбрасываем кэш и заново запрашиваем ресурсы.
+                // С --jobs=off Submit исполняется инлайн → кадр замирает.
+                // С --jobs=on задача уходит в фон → кадр ровный, в заголовке видно "loading: N".
+                Logger::Info("=== Reload resources (async L1 demo) ===");
+                ResourceManager::Get().Clear();
+                InitScene();
+            }
         }
         UpdateStressAnimation(gt);
     }
@@ -751,12 +834,25 @@ void Application::UpdateCaption()
     std::wstring info = L"  [";
     for (const char* c = StateName(mStateManager.GetCurrentState()); *c; ++c) info += (wchar_t)*c;
     info += L"]  jobs: ";
-    info += mJobs.IsParallelEnabled() ? (L"ON, " + std::to_wstring(mJobs.ThreadCount()) + L" threads") : std::wstring(L"OFF");
-    info += L"  objects: " + std::to_wstring(m_renderSystem ? m_renderSystem->LastStats().visible : 0) +
-            L" visible / " + std::to_wstring(m_world.GetEntities().size());
+    info += mJobs.IsParallelEnabled()
+        ? (L"ON, " + std::to_wstring(mJobs.ThreadCount()) + L" threads")
+        : std::wstring(L"OFF");
+
+    // Считаем так же, как лог RenderSystem: "видимые / кандидаты в этом окне".
+    // На обычной сцене кандидатов 4 (3 степлера + красный куб, все с тегом MainWindow);
+    // на стресс-сцене — 4 + N кубов. Раньше тут было m_world.GetEntities().size(),
+    // что включало камеру и объект второго окна и расходилось с логом.
+    const uint32_t visible = m_renderSystem ? m_renderSystem->LastStats().visible : 0;
+    const uint32_t candidates = m_renderSystem ? m_renderSystem->LastStats().candidates : 0;
+    info += L"  objects: " + std::to_wstring(visible) + L" visible / " + std::to_wstring(candidates);
+
+    const int pending = ResourceManager::Get().PendingLoads();
+    if (pending > 0)
+        info += L"  loading: " + std::to_wstring(pending);
+
     if (info != mCaptionInfo) {
         mCaptionInfo = info;
-        mMainWndCaption = L"Engine" + info; // D3DApp::CalculateFrameStats добавит FPS
+        mMainWndCaption = L"Engine" + info;
     }
 }
 
@@ -766,7 +862,17 @@ void Application::SpawnStressScene(uint32_t count)
 {
     if (!m_stress.entities.empty() || count == 0) return;
     ZoneScopedN("SpawnStressScene");
-    D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
+    // Async: если ресурсов нет в кэше, они загрузятся в фоне.
+    // 20 000 кубов получат placeholder-куб до тех пор, пока mesh не окажется на GPU.
+    m_stress.mesh = ResourceManager::Get().RequestMesh("assets/models/cube.obj");
+    for (const char* path : { "assets/textures/wood.jpg",
+                              "assets/textures/heart.jpg",
+                              "assets/textures/texture_stepler.jpg" }) {
+        if (auto tex = ResourceManager::Get().RequestTexture(path))
+            m_stress.textures.push_back(tex);
+    }
+
+   /* D3D12RenderAdapter* d3d = dynamic_cast<D3D12RenderAdapter*>(mRenderAdapter.get());
 
     m_stress.mesh = ResourceManager::Get().LoadMesh("assets/models/cube.obj");
     if (m_stress.mesh && d3d) d3d->UploadMeshToGPU(*m_stress.mesh);
@@ -775,7 +881,7 @@ void Application::SpawnStressScene(uint32_t count)
         if (!tex) continue;
         if (d3d && tex->srvIndex < 0) d3d->UploadTextureToGPU(*tex);
         m_stress.textures.push_back(tex);
-    }
+    }*/
 
     // Сетка кубов в плоскости XZ под основной сценой; фиксированный seed - одинаковая сцена в каждом замере
     const uint32_t side = (uint32_t)std::ceil(std::sqrt((double)count));
