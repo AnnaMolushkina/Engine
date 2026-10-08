@@ -8,11 +8,7 @@
     "enkits",
     "glm",
     "nlohmann-json",
-    "stb",
-    {
-      "name": "tracy",
-      "features": [ "on-demand" ]
-    }
+    "stb"
   ],
   "builtin-baseline": "07f4812200df3d3c931c0c8a6081d3b21fe2bf9f"
 }
