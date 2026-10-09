@@ -13,7 +13,16 @@ find_package(glm CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 find_package(enkiTS CONFIG REQUIRED)
-find_package(Tracy CONFIG REQUIRED)
+   include(FetchContent)
+   set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+   set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+   if(EXISTS "C:/dvizki/tracy-src/public/TracyClient.cpp")
+       FetchContent_Declare(tracy SOURCE_DIR "C:/dvizki/tracy-src")
+   else()
+       FetchContent_Declare(tracy
+           URL https://github.com/wolfpld/tracy/archive/refs/tags/v0.14.1.zip)
+   endif()
+   FetchContent_MakeAvailable(tracy)
 
 set(COMMON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Common")
 set(ENGINE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Chapter 4 Direct3D Initialization/Init Direct3D")
@@ -44,6 +53,7 @@ add_executable(Engine WIN32 ${COMMON_SOURCES} ${ENGINE_SOURCES} ${ENGINE_SHADERS
 
 target_include_directories(Engine PRIVATE "${COMMON_DIR}" "${ENGINE_DIR}" ${Stb_INCLUDE_DIR})
 target_compile_definitions(Engine PRIVATE UNICODE _UNICODE NOMINMAX)
+target_compile_definitions(Engine PRIVATE TRACY_ENABLE)
 target_link_libraries(Engine PRIVATE
     assimp::assimp
     glm::glm
